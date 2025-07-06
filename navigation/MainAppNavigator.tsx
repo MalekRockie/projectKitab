@@ -18,7 +18,12 @@ function MainAppNavigator() {
             options={{
                 headerShown: false
                 }}/>
-
+            <Drawer.Screen 
+            name="Profile"
+            component={ProfileScreen}
+            options={{
+                headerShown: false
+                }}/>
             
         </Drawer.Navigator>
         );
