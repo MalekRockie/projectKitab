@@ -5,5 +5,5 @@ export type RootStackParamList = {
     Login: undefined;
     TimelineScreen: undefined;
     MainApp: undefined;
-
+    ProfileScreen: undefined;
 };
