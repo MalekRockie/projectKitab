@@ -1,4 +1,4 @@
-import { FlatList, Text, Button } from "react-native";
+import { FlatList, Text, Butto, View } from "react-native";
 import { dummyPosts } from "../utils/dummyData";
 import PostFactory from '../components/posts/PostFactory';
 import TextPost from "../components/posts/TextPost";
@@ -14,29 +14,24 @@ export const TimelineScreen = () => {
     );
 
     return (
-
-        // <Text>Timeline Screen</Text>
-        // <FlatList
-        //     data={dummyPosts}
-        //     renderItem={renderItem}
-        //     keyExtractor={(item) => item.id}
-        //     contentContainerStyle={{ padding: 10 }}
-        // />
+        <View>
+            <TextPost
+                id="post123"
+                username="johndoe"
+                userAvatar="https://i.imgur.com/profile.jpg"
+                content="This is a sample text post that demonstrates how the component handles longer content by providing a read more/less toggle when the content exceeds the maximum allowed characters..."
+                likes={42}
+                comments={7}
+                timestamp="2023-05-20T14:30:00Z"
+                onLikePress={(postId, newLikeState) => {
+                    // Call your API here
+                    console.log(`Post ${postId} like status: ${newLikeState}`);
+                }}
+            />
+        </View>
         
-        <TextPost
-            id="post123"
-            username="johndoe"
-            userAvatar="https://i.imgur.com/profile.jpg"
-            content="This is a sample text post that demonstrates how the component handles longer content by providing a read more/less toggle when the content exceeds the maximum allowed characters..."
-            likes={42}
-            comments={7}
-            timestamp="2023-05-20T14:30:00Z"
-            onLikePress={(postId, newLikeState) => {
-                // Call your API here
-                console.log(`Post ${postId} like status: ${newLikeState}`);
-            }}
-        />
-        // <Button title="Open Drawer" onPress={() => navigation.toggleDrawer()} />
+
+            // <Button title="Open Drawer" onPress={() => navigation.toggleDrawer()} />
     );
 }
 
