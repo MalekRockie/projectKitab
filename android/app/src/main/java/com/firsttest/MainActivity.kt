@@ -18,9 +18,4 @@ class MainActivity : ReactActivity() {
           return RNGestureHandlerEnabledRootView(applicationContext)
         }
       }
-
-  override fun onPostCreate(savedInstanceState: Bundle?) {
-    super.onPostCreate(savedInstanceState)
-    (reactActivityDelegate as? ReactActivityDelegate)?.onPostCreate(savedInstanceState)
-  }
 }
