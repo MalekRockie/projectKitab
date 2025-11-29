@@ -8,17 +8,25 @@ import {
   useColorScheme,
 } from 'react-native';
 import { Colors } from 'react-native/Libraries/NewAppScreen';
-import { useNavigation } from '@react-navigation/native';
-import {TimelineScreen} from '../../screens/TimelineScreen';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/navigation';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
-export const LoginForm = () => {
-  const navigation = useNavigation<NavigationProp>();
+
+interface LoginFormProps {
+  LoginUpdate: (data: {emailaddess: string; password: string}) => void;
+  data?: string;
+}
+export const LoginForm: React.FC<LoginFormProps> = ({ LoginUpdate, data }) => {
+  
   const isDarkMode = useColorScheme() === 'dark';
   const safePadding = '5%';
+
+  const [emailaddress, setEmailAddress] = React.useState('');
+  const [password, setPassword] = React.useState('');
+
+
+  const handleClick = (data :{emailaddess: string; password: string}) => {
+    LoginUpdate(data);
+  };
 
   return (
     <View>
@@ -27,7 +35,7 @@ export const LoginForm = () => {
       </View>
       <View
         style={{
-          backgroundColor: isDarkMode ? Colors.black : Colors.white,
+          // backgroundColor: isDarkMode ? Colors.black : Colors.white,
           paddingHorizontal: safePadding,
           paddingBottom: safePadding,
         }}>
@@ -35,6 +43,7 @@ export const LoginForm = () => {
           style={{
             height: 40,
             borderColor: isDarkMode ? Colors.light : Colors.dark,
+            backgroundColor: 'white',
             borderWidth: 1,
             borderRadius: 5,
             marginBottom: 20,
@@ -43,11 +52,14 @@ export const LoginForm = () => {
           }}
           placeholder="Email Address"
           placeholderTextColor={isDarkMode ? Colors.light : Colors.dark}
+          onChangeText={setEmailAddress}
+          value={emailaddress}
         />
         <TextInput
           style={{
             height: 40,
             borderColor: isDarkMode ? Colors.light : Colors.dark,
+            backgroundColor: 'white',
             borderWidth: 1,
             borderRadius: 5,
             marginBottom: 20,
@@ -57,12 +69,14 @@ export const LoginForm = () => {
           placeholder="Password"
           placeholderTextColor={isDarkMode ? Colors.light : Colors.dark}
           secureTextEntry
+          onChangeText={setPassword}
+          value={password}
         />
         <Button
           title="Sign In"
-          color={isDarkMode ? Colors.light : Colors.dark}
+          // color={isDarkMode ? Colors.light : Colors.dark}
           onPress={() => {
-            navigation.navigate('MainApp');
+            handleClick({emailaddess: emailaddress, password: password});
           }}
         />
         <View style={styles.forgotContainer}>

@@ -1,6 +1,21 @@
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet, Button } from 'react-native';
+import { removeData } from '../services/storage/localstorage';
+import { createStaticNavigation, useNavigation } from '@react-navigation/native';
+import { useUTStore } from '../services/storage/store/tstore';
+
 
 export const ProfileScreen = () => {
+
+    const navigation = useNavigation();
+    const removeUserToken = useUTStore((state) => state.logout);
+    
+
+    const handleLogout = () => {
+        console.log("User logged out");
+        removeUserToken();
+        // navigation.navigate('Login');
+
+    }   
     return (
         <View style={styles.container}>
             <Image
@@ -25,6 +40,14 @@ export const ProfileScreen = () => {
                     <Text style={styles.statLabel}>Following</Text>
                 </View>
             </View>
+            <Button
+            style={{fontSize: 20, color: 'green'}}
+            styleDisabled={{color: 'red'}}
+            title="Sign Out"
+            onPress={handleLogout}
+            >
+            </Button>
+
         </View>
     );
 };
