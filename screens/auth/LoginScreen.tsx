@@ -13,7 +13,7 @@ import api from '../../services/api/base';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/navigation';
-import { useUTStore } from '../../services/storage/store/tstore';
+import { MMKVLoader } from "react-native-mmkv-storage";
 import { auth } from '../../services/api/auth/auth';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
@@ -24,7 +24,7 @@ export const LoginScreen: React.FC = () => {
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
-
+  const MMKV = new MMKVLoader().initialize();
 
   const navigation = useNavigation<NavigationProp>();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -32,9 +32,13 @@ export const LoginScreen: React.FC = () => {
   const loginCred = async (data: {emailaddess: string; password: string}) => {
     setIsLoading(true);
     try {
-      const result = await auth(data.emailaddess, data.password);
+      await auth(data.emailaddess, data.password);
     } catch (error) {
-      console.error("Error: ", error);
+      console.log("email: ", data.emailaddess);
+      console.log("password: ", data.password);
+      console.log("MMKV Token: ", MMKV.getString("authToken"));
+      console.log("Error: ", error);
+      
     } finally {
       setIsLoading(false);
     }

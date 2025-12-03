@@ -9,19 +9,30 @@ import MainAppNavigator from './navigation/MainAppNavigator';
 import { ProfileScreen } from './screens/profileScreen';
 import { SplashScreen } from './components/splashScreen';
 import { useUTStore } from './services/storage/store/tstore';
+import { getStoredToken } from './services/auth/checkAuth';
 
 const Stack = createNativeStackNavigator();
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
   const isAuth = useUTStore((state) => state.isLoggedIn);
+  const login = useUTStore((state) => state.login);
   const [isLoading, setIsLoading] = React.useState(true);
 
 
   useEffect(() => {
-    if (isAuth !== null){
-      setIsLoading(false);
+    const checkAuth = async () => {
+      const token = await getStoredToken();
+      console.log("Stored token: ", token); 
+      if(token){
+        login(token);
+        console.log("auth:", isAuth);
+        setIsLoading(false);
+      } else {
+        setIsLoading(false);
+      }
     }
+    checkAuth();
   }, []);
 
 
