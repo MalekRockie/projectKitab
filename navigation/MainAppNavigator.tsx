@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { TimelineScreen } from "../screens/TimelineScreen";
 import { ProfileScreen } from "../screens/profileScreen";
-import api from "../services/api/base";
+import {privateApi} from "../services/api/base";
 
 
 
@@ -14,10 +14,10 @@ function MainAppNavigator() {
         console.log("Fetching API health...");
         const fetchHealth = async () => {
             try {
-                const response = await api.get('/health');
+                const response = await privateApi.get('/api/p/v1/posts/f844a7da-c765-4abc-b16c-c928ed4a157b');
                 console.log(response.data);
             } catch (error) {
-                console.error("Error fetching API health:", error);
+                console.log("Error fetching API health:", error);
             }
         }
 

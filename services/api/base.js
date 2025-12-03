@@ -17,10 +17,14 @@ export const privateApi =  axios.create({
 privateApi.interceptors.request.use(req => {
     req.headers['Accept'] = 'application/json';
     req.headers['Authorization'] = `Bearer ${useUTStore.getState().userToken}`;
+    
     console.log('req set');
     return req;
 },(error) =>{
     console.log(error.response)
+    if (error.response.status === 401) {
+        Logout();
+    }
 });
 
 privateApi.interceptors.response.use(res => {
@@ -28,6 +32,9 @@ privateApi.interceptors.response.use(res => {
     return res;
 },(error) =>{
     console.log(error.response)
+    if (error.response.status === 401) {
+        Logout();
+    }
 });
 
 
