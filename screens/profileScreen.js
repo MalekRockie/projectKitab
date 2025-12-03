@@ -2,6 +2,7 @@ import { View, Text, Image, StyleSheet, Button } from 'react-native';
 import { removeData } from '../services/storage/localstorage';
 import { createStaticNavigation, useNavigation } from '@react-navigation/native';
 import { useUTStore } from '../services/storage/store/tstore';
+import { Logout } from '../services/api/auth/auth';
 
 
 export const ProfileScreen = () => {
@@ -11,10 +12,7 @@ export const ProfileScreen = () => {
     
 
     const handleLogout = () => {
-        console.log("User logged out");
-        removeUserToken();
-        // navigation.navigate('Login');
-
+        Logout();
     }   
     return (
         <View style={styles.container}>
