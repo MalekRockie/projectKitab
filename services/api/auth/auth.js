@@ -12,14 +12,33 @@ export const auth = async (eml, pswrd) => {
         email: eml,
         password: pswrd
     }).then(response => {
-        console.log("Login Successful");
-        console.log("Token: ", response.data.token.access_token);
         MMKV.setString("authToken", response.data.token.access_token);
+        MMKV.setString("refreshToken", response.data.token.refresh_token);
         useUTStore.getState().login(response.data.token.access_token);
     }).catch(error => {
         console.error("Auth Error: ", error.response.data.error);
     });
 }
+
+export const reAuth = async () => {
+    const rtoken = await MMKV.getStringAsync("refreshToken");
+    console.log("attempting to refresh");
+    try {
+        const response = await api.post('/api/v1/refreshtoken', {
+            refresh_token: rtoken
+        });
+        console.log("Refresh Successful");
+        useUTStore.getState().login(response.data.access_token);
+        MMKV.setString("authToken", response.data.access_token);
+        MMKV.setString("refreshToken", response.data.refresh_token);
+        console.log("Refresh Token: ", MMKV.getString("refreshToken"));
+        return "response.data.token";
+    } catch(error) {
+        console.error("ReAuth Error: ", error.response.data.error);
+    }
+}
+
+
 
 export const Logout = () => {
     MMKV.removeItem("authToken");

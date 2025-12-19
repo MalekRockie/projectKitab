@@ -12,3 +12,10 @@ export const getStoredToken = async () => {
         return token;
     } else return "";
 }
+
+export const getRToken = async () => {
+    const rtoken = await MMKV.getStringAsync("refreshToken");
+    if (rtoken) {
+        return rtoken;
+    } else return "";
+}
