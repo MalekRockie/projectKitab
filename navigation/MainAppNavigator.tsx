@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { TimelineScreen } from "../screens/TimelineScreen";
 import { ProfileScreen } from "../screens/profileScreen";
-import {privateApi} from "../services/api/base";
+import { HomeScreen } from "../screens/HomeScreen"; 
 
 
 
@@ -10,19 +10,19 @@ const Drawer = createDrawerNavigator();
 
 function MainAppNavigator() {
 
-    useEffect(() => {
-        console.log("Fetching API health...");
-        const fetchHealth = async () => {
-            try {
-                const response = await privateApi.get('/api/p/v1/posts/f844a7da-c765-4abc-b16c-c928ed4a157b');
-                console.log(response.data);
-            } catch (error) {
-                console.log("Error fetching API health:", error);
-            }
-        }
+    // useEffect(() => {
+    //     console.log("Fetching API health...");
+    //     const fetchHealth = async () => {
+    //         try {
+    //             const response = await privateApi.get('/api/p/v1/posts/f844a7da-c765-4abc-b16c-c928ed4a157b');
+    //             console.log(response.data);
+    //         } catch (error) {
+    //             console.log("Error fetching API health:", error);
+    //         }
+    //     }
 
-        fetchHealth();
-    }, []); 
+    //     fetchHealth();
+    // }, []); 
 
     return (
         <Drawer.Navigator 
@@ -36,11 +36,13 @@ function MainAppNavigator() {
             },
             drawerActiveBackgroundColor: '#1a1a1a',
             drawerPosition: 'right',
+            drawerType: 'front',
+
         }}
         >
             <Drawer.Screen 
                 name="Home" 
-                component={TimelineScreen}
+                component={HomeScreen}
                 options={{
                 headerShown: false
             }}/>
@@ -52,7 +54,7 @@ function MainAppNavigator() {
             }}/>
             <Drawer.Screen 
                 name="Hubs"
-                component={ProfileScreen}
+                component={HomeScreen}
                 options={{
                 headerShown: false
             }}/>
