@@ -14,7 +14,6 @@ import PostComponent from '../components/posts/postComp';
 import { shallow } from 'zustand/shallow';
 
 export const TimelineScreen = ({ tabType = 'foryou' }) => {
-    const navigation = useNavigation();
     const hasInitialFetch = useRef(false);
     
     const {
