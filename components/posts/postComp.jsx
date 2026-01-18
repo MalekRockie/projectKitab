@@ -8,7 +8,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const PostComponent = memo(({ postId }) => {
 
-    console.log('Post component rendering: ', postId);
+    // console.log('Post component rendering: ', postId);
     const post = usePStore(
         state => state.getPost(postId),
         shallow
@@ -18,7 +18,7 @@ const PostComponent = memo(({ postId }) => {
     
     
     const renderBlock = (block) => {
-        console.log(block.content)
+        // console.log(block.content)
         switch (block.blockType) {
             case 'text':
             return (

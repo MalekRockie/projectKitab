@@ -24,16 +24,18 @@ export const HomeScreen = () => {
 
     return (
         <View style={{ flex: 1 }}>
-            <TouchableOpacity
-                title="Open Drawer"
-                onPress={() => navigation.toggleDrawer()}
-                style={styles.hamburgerButtonContainer}
-                >
-                <Image 
-                    style={styles.hamburgerButton}
-                    source={require('../icons/burger-menu.png')}
-                    />
-            </TouchableOpacity>
+            <View style={styles.header}>
+                <TouchableOpacity
+                    title="Open Drawer"
+                    onPress={() => navigation.toggleDrawer()}
+                    style={styles.hamburgerButtonContainer}
+                    >
+                    <Image 
+                        style={styles.hamburgerButton}
+                        source={require('../icons/burger-menu.png')}
+                        />
+                </TouchableOpacity>
+            </View>
             <View style={styles.tabsContainer}>
             {routes.map((tab) =>
                 <TouchableOpacity
@@ -55,9 +57,11 @@ export const HomeScreen = () => {
 
 const styles = StyleSheet.create({
     header: {
-        backgroundColor: '#f4f4f4ff',
-        height: '20%',
-        justifyContent: 'center',
+        marginTop: 0,
+        width: '100%',
+        flexDirection: 'row',
+        paddingBottom: 10,
+        height: 50,
     },
     tabsContainer: {
         // backgroundColor: '#ff0000ff',
@@ -79,8 +83,10 @@ const styles = StyleSheet.create({
         padding: 10,
         width: 32,
         height: 32,
+        borderRadius: 50,
     },
     hamburgerButtonContainer: {
+        
         margin: 'auto',
         marginRight: 20,
         width: 32,

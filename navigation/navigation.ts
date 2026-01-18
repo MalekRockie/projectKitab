@@ -7,3 +7,11 @@ export type RootStackParamList = {
     MainApp: undefined;
     ProfileScreen: undefined;
 };
+
+export type DrawerParamList = {
+    Home: undefined;
+    Profile: undefined;
+    Hubs: undefined;
+    Messages: undefined;
+    Settings: undefined;
+};

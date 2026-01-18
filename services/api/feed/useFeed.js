@@ -32,9 +32,9 @@ export const useFeed = (feedKey = 'foryou') => {
 
             const postIds = addPosts(response.data, feedKey);
             
-            console.log(response.data);
-            console.log('Feed key:', feedKey);
-            console.log('Post IDs returned from addPosts:', postIds);
+            // console.log(response.data);
+            // console.log('Feed key:', feedKey);
+            // console.log('Post IDs returned from addPosts:', postIds);
             return response.data;
         } catch (err) {
             const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch posts';

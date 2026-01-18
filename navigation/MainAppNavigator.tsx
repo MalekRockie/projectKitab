@@ -1,31 +1,80 @@
 import React, { useEffect } from "react";
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createDrawerNavigator, DrawerItemList } from '@react-navigation/drawer';
 import { TimelineScreen } from "../screens/TimelineScreen";
 import { ProfileScreen } from "../screens/profileScreen";
 import { HomeScreen } from "../screens/HomeScreen"; 
+import { DrawerContentComponentProps, DrawerContentScrollView } from '@react-navigation/drawer';
+import { Image, Text, TouchableOpacity, View } from "react-native";
+import { useCUserStore } from "../services/storage/store/cUserStore";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerParamList } from "./navigation";
+
+// const Drawer = createDrawerNavigator();
+const Stack = createNativeStackNavigator();
+const Drawer = createDrawerNavigator<DrawerParamList>();
+
+function CustomDrawerContent(props: DrawerContentComponentProps) {
+    const navigation = props.navigation;
+
+    return (
+        <DrawerContentScrollView {...props} style={{ backgroundColor: '#0e0e0e' }}>
+        <View style={{
+            padding: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: '#333',
+            alignItems: 'center',
+            marginBottom: 10
+        }}>
+            <TouchableOpacity
+                onPress={() => navigation.navigate('Profile')}>
+                <Image 
+                source={require('../icons/avatarB.png')}
+                style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    marginBottom: 10
+                }}
+                />
+            </TouchableOpacity>
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>
+            {useCUserStore((state) => state.username)}
+            </Text>
+            <Text style={{ color: '#aaa', fontSize: 14 }}>
+            Follower 122 • Following 10
+            </Text>
+        </View>
+        
+        <DrawerItemList {...props} />
+        </DrawerContentScrollView>
+    );
+};
 
 
-
-const Drawer = createDrawerNavigator();
+function ProfileStack() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen 
+            name="ProfileMain" 
+                options={{
+                headerShown: false,
+                presentation: 'modal',
+                animationTypeForReplace: 'push',
+                animation:'slide_from_right'
+            }}
+            component={ProfileScreen} />
+        </Stack.Navigator>
+    );
+}
 
 function MainAppNavigator() {
 
-    // useEffect(() => {
-    //     console.log("Fetching API health...");
-    //     const fetchHealth = async () => {
-    //         try {
-    //             const response = await privateApi.get('/api/p/v1/posts/f844a7da-c765-4abc-b16c-c928ed4a157b');
-    //             console.log(response.data);
-    //         } catch (error) {
-    //             console.log("Error fetching API health:", error);
-    //         }
-    //     }
 
-    //     fetchHealth();
-    // }, []); 
 
     return (
         <Drawer.Navigator 
+        drawerContent={(props) => <CustomDrawerContent {...props}/>}
         screenOptions={{
             drawerStyle: {
                 backgroundColor: '#0e0e0e',
@@ -37,9 +86,9 @@ function MainAppNavigator() {
             drawerActiveBackgroundColor: '#1a1a1a',
             drawerPosition: 'right',
             drawerType: 'front',
-
         }}
         >
+            
             <Drawer.Screen 
                 name="Home" 
                 component={HomeScreen}
@@ -48,7 +97,7 @@ function MainAppNavigator() {
             }}/>
             <Drawer.Screen 
                 name="Profile"
-                component={ProfileScreen}
+                component={ProfileStack}
                 options={{
                 headerShown: false
             }}/>
