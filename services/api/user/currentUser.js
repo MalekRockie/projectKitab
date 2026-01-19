@@ -5,42 +5,25 @@ import { useEffect, useState } from "react";
 
 
 const api = privateApi;
-export const useCurrentUser = () => {
-
-    const [currentUser, setCurrentUser] = useState();
-    const [loading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const { updateProfile, clearProfile} = useCUserStore();
-
-    const getCurrentUser = async () => {
+export async function getCurrentUser (updateProfile) {
         try {
-            setIsLoading(true);
             const response = await api.get('/api/p/v1/myprofile')
-            console.log(response);
             const user = response.data.user;
-            updateProfile({
-                userId: user.id,
-                username: user.username,
-                bio: user.bio,
-                createdAt: user.creater_at,
-                updatedAt: user.updated_at,
-                profilePic: "",
-            });
-            setCurrentUser(response.data);
-            return response.data.user;
-            if(!response){
-                console.log("retrieve older information from the storage if it can't be fetched");
+            console.log(response.data)
+            if(response.data){
+                updateProfile({
+                    userId: user.id,
+                    username: user.username,
+                    bio: user.bio,
+                    createdAt: user.creater_at,
+                    updatedAt: user.updated_at,
+                    profilePic: "",
+                });
+                return response.data.user;
             }
         } catch (error){
             console.log(error);
-        } finally {
-            setIsLoading(false);
-        }
+            return null;
+        };
     };
-
-    useEffect(() => {
-        getCurrentUser();
-    }, []);
-
-    return {currentUser, loading, error, refetch: getCurrentUser};
-};
+    // return {currentUser, loading, error, refetch: getCurrentUser};

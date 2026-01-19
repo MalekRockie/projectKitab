@@ -32,12 +32,13 @@ export const useCUserStore = create<CurrentUserStore>()(
             ...initialState,
 
             updateProfile: (newUserInfo: Partial<UserProfile>) => {
+                console.log("hello")
                 set(state => ({
                     ...state,
                     ...newUserInfo,
                     
                 }));
-                console.log("hello")
+                
             },
             clearProfile: () => {
                 set(initialState);
@@ -46,7 +47,6 @@ export const useCUserStore = create<CurrentUserStore>()(
         {
             name: 'currentUser',
             storage: createJSONStorage(() => AsyncStorage),
-            
         },    
     ),
 )

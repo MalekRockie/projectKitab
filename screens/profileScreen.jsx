@@ -1,20 +1,26 @@
+import React, { useEffect } from 'react';
 import { View, Text, Image, StyleSheet, Button, TouchableOpacity, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useUTStore } from '../services/storage/store/tstore';
 import { Logout } from '../services/api/auth/auth';
 import { useCUserStore } from '../services/storage/store/cUserStore';
+import { getCurrentUser } from '../services/api/user/currentUser';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 
 export const ProfileScreen = () => {
 
     const navigation = useNavigation();
-    const removeUserToken = useUTStore((state) => state.logout);
-    
+    // const removeUserToken = useUTStore((state) => state.logout);
+    const  updateProfile  = useCUserStore(state => state.updateProfile);
 
     const handleLogout = () => {
         Logout();
-    }   
+    }
+
+    useEffect(() => {
+        getCurrentUser(updateProfile);
+    })
     return (
         <View style={styles.container}>
             <View style={styles.header}>
