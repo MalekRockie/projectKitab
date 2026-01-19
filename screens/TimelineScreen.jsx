@@ -35,7 +35,7 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         if(!hasInitialFetch.current || hasInitialFetch.current !== tabType){
             hasInitialFetch.current = tabType;
             refresh();
-            console.log(tabType);
+            // console.log(tabType);
         }
     }, [tabType]);
 

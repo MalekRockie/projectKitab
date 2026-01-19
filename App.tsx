@@ -23,7 +23,6 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const checkAuth = async () => {
       const token = await getStoredToken();
-      console.log("Stored token: ", token); 
       if(token){
         login(token);
         console.log("auth:", isAuth);
