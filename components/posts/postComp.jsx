@@ -1,22 +1,35 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from '../../services/storage/store/postStore';
 import { shallow } from 'zustand/shallow'
+import { togglePostLike } from '../../services/api/feed/post/post';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const PostComponent = memo(({ postId }) => {
-
-    // console.log('Post component rendering: ', postId);
     const post = usePStore(
         state => state.getPost(postId),
         shallow
-        );
+    );
+
+    const [isLiked, setIsLiked] = useState(post.isLiked);
+    const updatePost = usePStore(state => state.updatePost);
+
+
+    const likePost = () => {
+        try{
+            const like = togglePostLike(post.id, post.likesCount, updatePost);
+        } 
+        catch (err){
+            console.log(err);
+        }
+        setIsLiked(!isLiked);
+    }
 
     if (!post) return null;
     
-    
+
     const renderBlock = (block) => {
         // console.log(block.content)
         switch (block.blockType) {
@@ -71,11 +84,12 @@ const PostComponent = memo(({ postId }) => {
                             </TouchableOpacity>
                             <TouchableOpacity 
                             style={styles.actionButton} 
+                            onPress={()=> likePost()}
                             >
                                 <Icon 
-                                    name={post.isLiked ? "favorite" : "favorite-border"} 
+                                    name={isLiked ? "favorite" : "favorite-border"} 
                                     size={20} 
-                                    color={post.isLiked ? "#ff4444" : "#666"} 
+                                    color={post.isLiked ? "#ff4444" : "#ff0000ff"} 
                                 />
                                 <Text style={styles.actionText}>{post.likesCount}</Text>
                             </TouchableOpacity>
