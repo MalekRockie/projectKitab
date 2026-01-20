@@ -1,5 +1,5 @@
-import React, { memo, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity } from 'react-native';
+import React, { memo, useState } from 'react';
+import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from '../../services/storage/store/postStore';
 import { shallow } from 'zustand/shallow'
@@ -15,6 +15,8 @@ const PostComponent = memo(({ postId }) => {
 
     const [isLiked, setIsLiked] = useState(post.isLiked);
     const updatePost = usePStore(state => state.updatePost);
+    const [expanded, setExpanded] = useState(false);
+    const MAX_CONTENT_LENGTH = 250;
 
 
     const likePost = () => {
@@ -27,6 +29,8 @@ const PostComponent = memo(({ postId }) => {
         setIsLiked(!isLiked);
     }
 
+    const toggleExpand = () => setExpanded(!expanded);
+
     if (!post) return null;
     
 
@@ -35,9 +39,14 @@ const PostComponent = memo(({ postId }) => {
         switch (block.blockType) {
             case 'text':
             return (
-            <Text style={styles.textBlock} key={block.id}>
-                {block.content}
-            </Text>
+            <View style={styles.content} key={block.id}>
+                <Text style={styles.textBlock}>
+                    {block.content.length > MAX_CONTENT_LENGTH && !expanded ? `${block.content.substring(0, MAX_CONTENT_LENGTH)}...` : block.content}
+                    {block.content.length > MAX_CONTENT_LENGTH && (
+                        <Text onPress={toggleExpand} style={styles.readMore}>{!expanded ? ' Show more' : ''}</Text>
+                    )}
+                </Text>
+            </View>
             );
         
         
@@ -70,7 +79,7 @@ const PostComponent = memo(({ postId }) => {
                         </View>
                         
                         {/* Post blocks */}
-                        <View style={styles.content}>
+                        <View>
                             {post.postblocks.map(renderBlock)}
                         </View>
                         
@@ -138,6 +147,11 @@ const styles = StyleSheet.create({
         fontSize: 15,
         lineHeight: 20,
         marginBottom: 8,
+    },
+    readMore: {
+        color: '#1a73e8',
+        marginTop: 4,
+        fontWeight: '500',
     },
     media: {
         width: SCREEN_WIDTH - 24,

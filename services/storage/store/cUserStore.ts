@@ -32,7 +32,6 @@ export const useCUserStore = create<CurrentUserStore>()(
             ...initialState,
 
             updateProfile: (newUserInfo: Partial<UserProfile>) => {
-                console.log("hello")
                 set(state => ({
                     ...state,
                     ...newUserInfo,

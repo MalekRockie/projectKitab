@@ -7,7 +7,6 @@ import {
     Text,
     RefreshControl 
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useFeed } from '../services/api/feed/useFeed'; 
 import { usePStore } from '../services/storage/store/postStore';
 import PostComponent from '../components/posts/postComp';

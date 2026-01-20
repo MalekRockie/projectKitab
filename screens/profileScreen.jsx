@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, Image, StyleSheet, Button, TouchableOpacity, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useUTStore } from '../services/storage/store/tstore';
 import { Logout } from '../services/api/auth/auth';
 import { useCUserStore } from '../services/storage/store/cUserStore';
 import { getCurrentUser } from '../services/api/user/currentUser';
