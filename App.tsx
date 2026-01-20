@@ -25,7 +25,7 @@ function App(): React.JSX.Element {
       const token = await getStoredToken();
       if(token){
         login(token);
-        console.log("auth:", isAuth);
+        // console.log("auth:", isAuth);
         setIsLoading(false);
       } else {
         setIsLoading(false);

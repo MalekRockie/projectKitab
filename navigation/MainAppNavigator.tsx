@@ -7,7 +7,6 @@ import { DrawerContentComponentProps, DrawerContentScrollView } from '@react-nav
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { useCUserStore } from "../services/storage/store/cUserStore";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
 import { DrawerParamList } from "./navigation";
 
 // const Drawer = createDrawerNavigator();
