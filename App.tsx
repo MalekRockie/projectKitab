@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import 'react-native-gesture-handler';
 import { StatusBar, useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import LoginScreen from './screens/auth/LoginScreen';
 import MainAppNavigator from './navigation/MainAppNavigator';
@@ -10,10 +10,11 @@ import { ProfileScreen } from './screens/profileScreen';
 import { SplashScreen } from './components/splashScreen';
 import { useUTStore } from './services/storage/store/tstore';
 import { getStoredToken } from './services/auth/checkAuth';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
-function App(): React.JSX.Element {
+function App(){
   const isDarkMode = useColorScheme() === 'dark';
   const isAuth = useUTStore((state) => state.isLoggedIn);
   const login = useUTStore((state) => state.login);
@@ -42,24 +43,25 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? Colors.darker : Colors.lighter}
-      />
-      <Stack.Navigator 
-      screenOptions={{ headerShown: false }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        <StatusBar
+          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          backgroundColor={isDarkMode ? Colors.darker : Colors.lighter}
+        />
+        <Stack.Navigator 
+        screenOptions={{ headerShown: false,animation: 'default', gestureEnabled: false}}>
 
-        {!isAuth ? (
-          <Stack.Screen name={"Login"} component={LoginScreen}/>
-        ) : (
-          <>
-            <Stack.Screen name={"MainApp"} component={MainAppNavigator}/>
-            <Stack.Screen name={"Profile"} component={ProfileScreen}/>
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+          {!isAuth ? (
+            <Stack.Screen name={"Login"} component={LoginScreen}/>
+          ) : (
+            <>
+              <Stack.Screen name={"MainApp"} component={MainAppNavigator}/>
+            </>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </GestureHandlerRootView>
   );
 }
 export default App;
