@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, Image} from 'react-native'
+import {View, Text, TouchableOpacity, StyleSheet, Image, Pressable} from 'react-native'
 import {TimelineScreen} from './TimelineScreen'
 import { useNavigation } from '@react-navigation/native';
 
-export const HomeScreen = () => {
+export const HomeScreen = ({visible, onOpenSidebar}) => {
 
     const navigation = useNavigation();
     // const renderItem = ({ item }) => (
@@ -17,6 +17,10 @@ export const HomeScreen = () => {
 
     const [currenttab, setCurrentTab] = useState('foryou');
 
+    const toggleSidebar = () => {
+        onOpenSidebar();
+    }
+
     const setTab = (newTab) =>{
         setCurrentTab(newTab);
         console.log(newTab);
@@ -25,16 +29,17 @@ export const HomeScreen = () => {
     return (
         <View style={{ flex: 1 }}>
             <View style={styles.header}>
-                <TouchableOpacity
+                <Pressable
                     title="Open Drawer"
-                    onPress={() => navigation.toggleDrawer()}
-                    style={styles.hamburgerButtonContainer}
+                    android_disableSound={true}
+                    onPress={() => toggleSidebar()}
+                    style={({ pressed }) => [styles.hamburgerButtonContainer, { opacity: pressed ? 0.5 : 1.0 }]}
                     >
                     <Image 
                         style={styles.hamburgerButton}
                         source={require('../icons/burger-menu.png')}
                         />
-                </TouchableOpacity>
+                </Pressable>
             </View>
             <View style={styles.tabsContainer}>
             {routes.map((tab) =>
