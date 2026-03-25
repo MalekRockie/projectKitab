@@ -23,12 +23,13 @@ export const ProfileScreen = () => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
+                <Pressable
+                    android_disableSound={true}
+                    style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.5 : 1.0 }]}
                     onPress={() => navigation.goBack()}
                 >
                     <Icon name="arrow-back" size={24} color="black" />
-                </TouchableOpacity>
+                </Pressable>
                 <View
                     style={styles.pageTitleContainer}>
                     <Text style={styles.pageTitle}>
@@ -38,7 +39,7 @@ export const ProfileScreen = () => {
                         150 posts
                     </Text>
                 </View>
-                <TouchableOpacity
+                {/* <TouchableOpacity
                     title="Open Drawer"
                     onPress={() => navigation.toggleDrawer()}
                     style={styles.hamburgerButtonContainer}
@@ -47,7 +48,7 @@ export const ProfileScreen = () => {
                         style={styles.hamburgerButton}
                         source={require('../icons/burger-menu.png')}
                         />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
 
             <View
@@ -63,6 +64,7 @@ export const ProfileScreen = () => {
                             source={useCUserStore((state) => state.profilePic) ? { uri: useCUserStore((state) => state.profilePic) } : require('../icons/avatarB.png')}
                             style={styles.avatar}/>
                             <Pressable
+                                android_disableSound={true}
                                 style={({ pressed }) => [
                                     {
                                     backgroundColor: pressed ? "#373737ff" : "#242424ff",
@@ -102,13 +104,13 @@ export const ProfileScreen = () => {
                         </View>
                     </View>
                 </View>
-                    {/* <Button
+                    <Button
                     style={{fontSize: 20, color: 'green'}}
                     styleDisabled={{color: 'red'}}
                     title="Sign Out"
                     onPress={handleLogout}
                     >
-                    </Button> */}
+                    </Button>
                 <View
                     style={styles.postSection}>
                     {/* posts */}
@@ -152,8 +154,8 @@ const styles = StyleSheet.create({
         marginTop: 80,
     },
     avatar: {
-        width: 100,
-        height: 100,
+        width: 70,
+        height: 70,
         borderRadius: 50,
         marginLeft: '20',
         marginBottom: 0,
