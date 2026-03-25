@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ProfileScreen } from "../screens/profileScreen";
 import { HomeScreen } from "../screens/HomeScreen"; 
+import { PostScreen } from "../screens/PostScreen";
 import { View } from "react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Sidebar } from "../components/sidebar/Sidebar";
@@ -31,7 +32,7 @@ function MainAppNavigator() {
                     }
                 </Stack.Screen>
                 <Stack.Screen name={"Profile"} component={ProfileScreen}/>
-                {/* <Stack.Screen name="Hubs" component={ProfileScreen} /> */}
+                <Stack.Screen name={"PostScreen"} component={PostScreen} />
                 {/* <Stack.Screen name="Messages" component={ProfileScreen} /> */}
                 {/* <Stack.Screen name="Settings" component={ProfileScreen} /> */}
             </Stack.Navigator>

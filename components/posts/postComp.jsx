@@ -1,10 +1,11 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from '../../services/storage/store/postStore';
 import { shallow } from 'zustand/shallow'
 import { togglePostLike } from '../../services/api/feed/post/post';
-
+import { useNavigation, NavigationContainer } from '@react-navigation/native';
+import { TextInput } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PostComponent = memo(({ postId }) => {
@@ -12,12 +13,13 @@ const PostComponent = memo(({ postId }) => {
         state => state.getPost(postId),
         shallow
     );
-
     const [isLiked, setIsLiked] = useState(post.isLiked);
     const updatePost = usePStore(state => state.updatePost);
     const [expanded, setExpanded] = useState(false);
+    const navigation = useNavigation();
     const MAX_CONTENT_LENGTH = 250;
-
+    const [isPressed, setIsPressed] = useState(false);
+    const pressTimer = useRef(null);
 
     const likePost = () => {
         try{
@@ -29,6 +31,7 @@ const PostComponent = memo(({ postId }) => {
         setIsLiked(!isLiked);
     }
 
+    
     const toggleExpand = () => setExpanded(!expanded);
 
     if (!post) return null;
@@ -56,8 +59,22 @@ const PostComponent = memo(({ postId }) => {
     };
 
     return (
-        <TouchableOpacity>
-            <View style={styles.container}>
+        <Pressable
+            android_disableSound={true}
+            onPressIn={() => {
+                pressTimer.current = setTimeout(() => {
+                    setIsPressed(true);
+                }, 115);
+            }}
+            onPressOut={() => {
+                clearTimeout(pressTimer.current);
+                setIsPressed(false);
+            }}
+            style={[styles.container, { backgroundColor: isPressed ? "#e0e0e0" : "#FFFFFF" }]}
+            onPress={() => navigation.navigate("MainApp", {screen: "PostScreen", params: { post: post }})}
+            //.navigate(stack, { screen: screen })
+        >
+            {/* <View style={styles.container}> */}
                     {/* Left side: avatar */}
                     <View>
                         <Image 
@@ -85,11 +102,20 @@ const PostComponent = memo(({ postId }) => {
                         
                         {/* footer (likes, comments) */}
                         <View style={styles.actionBar}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
+                                touchSoundDisabled={true}
                                 style={styles.actionButton} 
                                 >
                                 <Icon name="chat-bubble-outline" size={20} color="#666" />
                                 <Text style={styles.actionText}>{post.commentCount}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={styles.actionButton}>
+                                <Icon 
+                                    name="repeat"
+                                    size={20}
+                                />
+                                <Text style={styles.actionText}>0</Text>
                             </TouchableOpacity>
                             <TouchableOpacity 
                             style={styles.actionButton} 
@@ -105,18 +131,19 @@ const PostComponent = memo(({ postId }) => {
                             {/* <Text>{post.likesCount} likes • {post.commentCount} comments</Text> */}
                         </View>
                     </View>
-            </View>
-        </TouchableOpacity>
+            {/* </View> */}
+        </Pressable>
     );
 });
 
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-        backgroundColor: '#fff',
-        marginBottom: 1,
+        // marginBottom: 0.5,
         padding: 10,
-        width: '100%'
+        width: '100%',
+        borderBottomWidth: 1,
+        borderBottomColor: "#e6e6e6"
     },
     postHeader: {
         flexDirection: 'row',
@@ -184,7 +211,7 @@ const styles = StyleSheet.create({
     actionText: {
         marginLeft: 4,
         color: '#666',
-    },
+    }
 });
 
 export default PostComponent;
