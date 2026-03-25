@@ -2,7 +2,6 @@ import { useNavigation } from "@react-navigation/native";
 import { Image, StyleSheet, Text, TouchableOpacity, View, Button, Dimensions, Pressable } from "react-native";
 import { useCUserStore } from "../../services/storage/store/cUserStore";
 import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withSpring, withTiming, Easing, withRepeat, withSequence, withDelay, withDecay, withClamp, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useEffect, useState } from "react";
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -89,8 +88,8 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
     };
 
     const redirect = (stack, screen) => {
-        console.log("Reached", stack);
-        console.log("Reached", screen);
+        // console.log("Reached", stack);
+        // console.log("Reached", screen);
         navigation.navigate(stack, { screen: screen })
     };
     const toggleSidebar = (() => {

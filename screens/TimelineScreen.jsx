@@ -61,7 +61,7 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         if (isLoading) {
         return (
             <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator size="large" color="#0000ff" />
             </View>
         );
         }
@@ -69,13 +69,13 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         if (error) {
         return (
             <View style={styles.centerContainer}>
-            <Text style={styles.errorText}>Error: {error}</Text>
-            <Text 
-                style={styles.retryText} 
-                onPress={refresh}
-            >
-                Tap to retry
-            </Text>
+                <Text style={styles.errorText}>Error: {error}</Text>
+                <Text 
+                    style={styles.retryText} 
+                    onPress={refresh}
+                >
+                    Tap to retry
+                </Text>
             </View>
         );
         }
