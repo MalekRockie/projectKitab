@@ -5,6 +5,7 @@ import { PostScreen } from "../screens/PostScreen";
 import { View } from "react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Sidebar } from "../components/sidebar/Sidebar";
+import { CommentComposer } from "../screens/CommentComposerScreen";
 
 const Stack = createStackNavigator();
 
@@ -33,6 +34,13 @@ function MainAppNavigator() {
                 </Stack.Screen>
                 <Stack.Screen name={"Profile"} component={ProfileScreen}/>
                 <Stack.Screen name={"PostScreen"} component={PostScreen} />
+                <Stack.Screen 
+                    name={"CommentComposerScreen"} 
+                    options={{ 
+                        animation: 'slide_from_bottom',
+                        // gestureEnabled: true, 
+                    }} 
+                    component={CommentComposer}/>
                 {/* <Stack.Screen name="Messages" component={ProfileScreen} /> */}
                 {/* <Stack.Screen name="Settings" component={ProfileScreen} /> */}
             </Stack.Navigator>
