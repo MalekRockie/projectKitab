@@ -102,13 +102,14 @@ const PostComponent = memo(({ postId }) => {
                         
                         {/* footer (likes, comments) */}
                         <View style={styles.actionBar}>
-                            <TouchableOpacity
-                                touchSoundDisabled={true}
+                            <Pressable
+                                android_disableSound={true}
                                 style={styles.actionButton} 
+                                onPress={()=> navigation.navigate("MainApp", {screen: 'CommentComposerScreen', params: { post: post }})}
                                 >
                                 <Icon name="chat-bubble-outline" size={20} color="#666" />
                                 <Text style={styles.actionText}>{post.commentCount}</Text>
-                            </TouchableOpacity>
+                            </Pressable>
                             <TouchableOpacity 
                                 style={styles.actionButton}>
                                 <Icon 
