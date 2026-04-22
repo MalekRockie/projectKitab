@@ -6,6 +6,7 @@ import { View } from "react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { CommentComposer } from "../screens/CommentComposerScreen";
+import { CommentFocusScreen } from "../screens/CommentFocusScreen";
 
 const Stack = createStackNavigator();
 
@@ -34,6 +35,12 @@ function MainAppNavigator() {
                 </Stack.Screen>
                 <Stack.Screen name={"Profile"} component={ProfileScreen}/>
                 <Stack.Screen name={"PostScreen"} component={PostScreen} />
+                <Stack.Screen 
+                    name={"CommentScreen"} component={CommentFocusScreen}
+                    options={{ 
+                        animation: 'slide_from_right',
+                        // gestureEnabled: true, 
+                    }}/>
                 <Stack.Screen 
                     name={"CommentComposerScreen"} 
                     options={{ 

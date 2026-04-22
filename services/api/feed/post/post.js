@@ -31,10 +31,30 @@ export async function createComment(postId, comment) {
 }
 export async function getPostComments(postID, sortOption) {
     try{
-        console.log(sortOption);
-        const response = await api.get(`/api/p/v1/posts/${postID}/comments`);
-        return response.data;
+        // console.log(sortOption);
+        const response = await api.get(`/api/p/v1/posts/${postID}/comments?sort=${sortOption}`);
+        // console.log(response)
+        if(response != null)
+            return response.data;
+        else return null;
     } catch (error) {
+        console.log("error occured", error);
+        return null;
+    }
+}
+
+export async function getCommentReplies(commentID) {
+    try {
+        console.log(commentID);
+        const response = await api.get(`api/p/v1/comment/${commentID}/replies`);
+        console.log(response);
+        if(response != null)
+            {
+                console.log(response.data);
+                return response.data;
+            }
+        else return null;
+    } catch (error){ 
         console.log("error occured", error);
         return null;
     }
