@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable 
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from "../services/storage/store/postStore";
 import { useNavigation } from "@react-navigation/native";
-import { createComment, getPostComments, togglePostLike } from "../services/api/feed/post/post";
+import { createComment, getCommentReplies, getPostComments, togglePostLike } from "../services/api/feed/post/post";
 import { FlatList, RefreshControl } from "react-native-gesture-handler";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -27,10 +27,18 @@ const getTimeAgo = (dateString) => {
     });
 };
 
-const CommentItem = ({ comment, renderBlock }) => {
+const CommentItem = ({ comment, renderBlock, post }) => {
     const [isPressed, setIsPressed] = useState(false);
     const pressTimer = useRef(null);
-    
+    const navigation = useNavigation();
+    const fetchReplies = async (commentID) => {
+        const response = await getCommentReplies(commentID);
+        console.log(response);
+    }
+
+    const naviageToComment = async() =>{
+        navigation.navigate("MainApp", {screen: 'CommentScreen', params: { comment, post }})
+    }
     // console.log(comment.created_at);
     return (
         <Pressable 
@@ -44,6 +52,7 @@ const CommentItem = ({ comment, renderBlock }) => {
                 clearTimeout(pressTimer.current);
                 setIsPressed(false);
             }}
+            onPress={() => navigation.navigate("MainApp", {screen: 'CommentScreen', params: { comment, post }})}
             style={[commentStyles.container, { backgroundColor: isPressed ? "#e0e0e0" : "#FFFFFF" }]}>
             <View style={commentStyles.header}>
                 <Image
@@ -93,11 +102,18 @@ export const PostScreen = ({ route }) => {
     // const [newComment, setNewComment] = useState('');
     const [postComments, setPostComments] = useState();
     const [dropdownVisible, setDropdownVisible] = useState(false);
-    const [selectedOption, setSelectedOption] = useState('Top Comments');
+    const [selectedOption, setSelectedOption] = useState({name:'Top Comments', value: 'top'});
     const [dropdownPos, setDropdownPos] = useState({ x: 0, y: 0, width: 0, height: 0 });
     const buttonRef = useRef(null);
 
-    const options = ['Most Recent', 'Top Comments'];
+    const options = [{
+        name: 'Most Recent',
+        value: 'recent'
+    },
+    {
+        name:'Top Comments', 
+        value: 'top'
+    }];
 
     const handleOpenDropdown = () => {
         buttonRef.current?.measureInWindow((x, y, width, height) => {
@@ -115,13 +131,15 @@ export const PostScreen = ({ route }) => {
 
     const fetchComments = async (option) => {
         if (option == null) option = selectedOption;
-        const response = await getPostComments(post.id, option);
+        const response = await getPostComments(post.id, option.value);
         setPostComments(response.comments);
         if (response.total_count != post.total_count) {
             updatePost(post.id, { commentCount: response.total_count });
             post.total_count = response.total_count;
         }
     };
+
+
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -199,10 +217,11 @@ export const PostScreen = ({ route }) => {
             </View>
 
             <FlatList
+                style={{ flex: 1 }}
                 data={postComments}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                    <CommentItem comment={item} renderBlock={renderBlock} />
+                    <CommentItem comment={item} renderBlock={renderBlock} post={post} />
                 )}
                 bounces={true}
                 overScrollMode="always"
@@ -282,14 +301,14 @@ export const PostScreen = ({ route }) => {
                                 style={styles.CommentTreeHeaderButton}
                                 onPress={handleOpenDropdown}
                             >
-                                <Text>{selectedOption}</Text>
+                                <Text>{selectedOption.name}</Text>
                             </Pressable>
                         </View>
                     </>
                 }
                 ListFooterComponent={
                     <View>
-                        <Text style={{ margin: 'auto', fontSize: 24, color: '#c7c7c7' }}>•</Text>
+                        <Text style={{ margin: 'auto', fontSize: 28, color: '#c7c7c7',}}>•</Text>
                     </View>
                 }
             />
@@ -321,9 +340,9 @@ export const PostScreen = ({ route }) => {
                             >
                                 <Text style={[
                                     styles.dropdownText,
-                                    selectedOption === option && styles.selectedText
+                                    selectedOption === option.name && styles.selectedText
                                 ]}>
-                                    {option}
+                                    {option.name}
                                 </Text>
                             </Pressable>
                         ))}
@@ -337,7 +356,7 @@ export const PostScreen = ({ route }) => {
 
 const styles = StyleSheet.create({
     container:{
-        flexDirection: 'col',
+        flex: 1,
     },
     postContainer: {
         backgroundColor: '#fff',
