@@ -123,7 +123,6 @@ const renderPostBlocks = (blocks, expanded, toggleExpand) => {
                 }
             })}
             
-            {/* Optional: Show "Show less" when expanded and content was long */}
             {isLongContent && expanded && (
                 <Text 
                     onPress={toggleExpand} 
@@ -297,22 +296,6 @@ const AncestorComment = ({ comment, onPress }) => {
                         <Text style={styles.ancestorTimestamp}>• {getTimeAgoForAncestor(comment.created_at)}</Text>
                     </View>
                     <View style={styles.ancestorBody}>
-                        {/* {comment.blocks?.map((block) => {
-                            const type = block.blockType || block.block_type;
-                            if (type === "text") {
-                                return (
-                                    <Text
-                                        key={block.id}
-                                        style={styles.ancestorText}
-                                        numberOfLines={2}
-                                        ellipsizeMode="tail"
-                                    >
-                                        {block.content}
-                                    </Text>
-                                );
-                            }
-                            return null;
-                        })} */}
                         {renderPostBlocks(comment.blocks, expanded, setExpanded)}
                     </View>
                     <View style={threadStyles.AncestorActionBar}>
@@ -435,10 +418,20 @@ export const CommentFocusScreen = ({ route }) => {
     const [ancestors, setAncestors] = useState(passedAncestors ?? []);
     const [loadingAncestors, setLoadingAncestors] = useState(!isTopLevel && !passedAncestors);
     const [showAllAncestors, setShowAllAncestors] = useState(false);
+    const [bottomPadding, setBottomPadding] = useState(250);
     const flatListRef = useRef(null);
-    const headerHeight = useRef(0);
-    const focusedCommentHeight = useRef(0);
+    const screenHeight = Dimensions.get("window").height;
     
+
+    const ITEM_HEIGHTS = {
+        post: 228,
+        ancestor: 152,
+        focused: 152,
+        reply: 120,
+        divider: 1,
+        view_more: 37,
+    };
+
     useEffect(() => {
         if (isTopLevel || passedAncestors) return;
         const fetchAncestors = async () => {
@@ -453,23 +446,16 @@ export const CommentFocusScreen = ({ route }) => {
         fetchAncestors();
     }, [comment.id]);
 
-    useEffect(() => {
-        if (!loadingReplies && flatListRef.current) {
-            setTimeout(() => {
-                const offset = headerHeight.current - focusedCommentHeight.current;
-                flatListRef.current?.scrollToOffset({ 
-                    offset: Math.max(0, offset),
-                    animated: false 
-                });
-            }, 50);
-        }
-    }, [loadingReplies]);
     const fetchReplies = async () => {
         try {
             const response = await getCommentReplies(comment.id);
             if (response) setReplies(response.comments ?? response);
+            if (response.comments.length > 5) setBottomPadding(0);
+            else if(response.comments.length > 3) setBottomPadding(ITEM_HEIGHTS.reply * 2);
+            else setBottomPadding(ITEM_HEIGHTS.reply * 2.3);
         } catch (err) {
             console.log("failed to fetch replies", err);
+            setBottomPadding(ITEM_HEIGHTS.reply * 4.9);
         } finally {
             setLoadingReplies(false);
         }
@@ -485,9 +471,8 @@ export const CommentFocusScreen = ({ route }) => {
         setRefreshing(false);
     };
 
-    const handlePostPress = () => {
-        navigation.push("PostScreen", {post})
-    }
+    const handlePostPress = () => navigation.push("PostScreen", { post });
+
     const handleReplyPress = (reply) => {
         const nextAncestors = [...ancestors, comment];
         const trimmed =
@@ -504,15 +489,42 @@ export const CommentFocusScreen = ({ route }) => {
 
     const hiddenCount = ancestors.length - MAX_ANCESTORS_SHOWN;
 
-    const ListHeader = () => (
-        <View onLayout={(e) => { headerHeight.current = e.nativeEvent.layout.height; }}>
-            <PostCard post={post} onPress={handlePostPress} />
+    const items = [
+        { type: 'post', id: 'post', data: post },
+        ...(hiddenCount > 0 && !showAllAncestors
+            ? [{ type: 'view_more', id: 'view_more' }]
+            : []),
+        ...visibleAncestors.map(a => ({ type: 'ancestor', id: a.id, data: a })),
+        { type: 'focused', id: comment.id, data: comment },
+        { type: 'divider', id: 'divider' },
+        ...replies.map(r => ({ type: 'reply', id: r.id, data: r })),
+    ];
 
-            {loadingAncestors ? (
-                <ActivityIndicator size="small" color="#aaa" style={{ marginVertical: 12 }} />
-            ) : (
-                <View onLayout={(e) => { headerHeight.current = e.nativeEvent.layout.height; }}>
-                    {hiddenCount > 0 && !showAllAncestors && (
+    const focusedIndex = items.findIndex(item => item.type === 'focused');
+
+    const getItemLayout = (_, index) => {
+        let offset = 0;
+        for (let i = 0; i < index; i++) {
+            offset += ITEM_HEIGHTS[items[i]?.type] ?? ITEM_HEIGHTS.reply;
+        }
+        return {
+            length: ITEM_HEIGHTS[items[index]?.type] ?? ITEM_HEIGHTS.reply,
+            offset,
+            index,
+        };
+    };
+
+    const renderItem = ({ item }) => {
+        switch (item.type) {
+            case 'post':
+                return (
+                    <View onLayout={(e) => console.log('post height:', e.nativeEvent.layout.height)}>
+                        <PostCard post={item.data} onPress={handlePostPress} />
+                    </View>
+                );
+            case 'view_more':
+                return (
+                    <View onLayout={(e) => console.log('ancestor height:', e.nativeEvent.layout.height)}>
                         <Pressable
                             android_disableSound={true}
                             onPress={() => setShowAllAncestors(true)}
@@ -522,11 +534,13 @@ export const CommentFocusScreen = ({ route }) => {
                                 ↑ View {hiddenCount} more {hiddenCount === 1 ? "reply" : "replies"} in thread
                             </Text>
                         </Pressable>
-                    )}
-                    {visibleAncestors.map((ancestor) => (
+                    </View>
+                );
+            case 'ancestor':
+                return (
+                    <View onLayout={(e) => console.log('ancestor height:', e.nativeEvent.layout.height)}>
                         <AncestorComment
-                            key={ancestor.id}
-                            comment={ancestor}
+                            comment={item.data}
                             onPress={(a) =>
                                 navigation.push("CommentScreen", {
                                     comment: a,
@@ -535,17 +549,23 @@ export const CommentFocusScreen = ({ route }) => {
                                 })
                             }
                         />
-                    ))}
+                    </View>
+
+                );
+            case 'focused':
+            return (
+                <View onLayout={(e) => console.log('focused height:', e.nativeEvent.layout.height)}>
+                    <FocusedComment comment={item.data} />
                 </View>
-            )}
-
-            <FocusedComment comment={comment} onLayout={(e) => { focusedCommentHeight.current = e.nativeEvent.layout.height; }} />
-
-            <View>
-                <View style={styles.replyDividerLine} />
-            </View>
-        </View>
-    );
+            );
+            case 'divider':
+                return <View style={styles.replyDividerLine} />;
+            case 'reply':
+                return <ReplyItem reply={item.data} onPress={handleReplyPress} />;
+            default:
+                return null;
+        }
+    };
 
     return (
         <View style={styles.screenContainer}>
@@ -564,13 +584,15 @@ export const CommentFocusScreen = ({ route }) => {
                 <ActivityIndicator size="large" color="#1a1a1a" style={{ marginTop: 40 }} />
             ) : (
                 <FlatList
+                    ref={flatListRef}
                     style={{ flex: 1 }}
-                    data={replies}
+                    data={items}
                     keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => <ReplyItem reply={item} onPress={handleReplyPress} />}
-                    ListHeaderComponent={<ListHeader />}
+                    renderItem={renderItem}
+                    initialScrollIndex={focusedIndex}
+                    getItemLayout={getItemLayout}
                     ListFooterComponent={
-                        <View>
+                        <View style={{ paddingBottom: bottomPadding }}>
                             <Text style={{ margin: "auto", fontSize: 28, color: "#c7c7c7" }}>•</Text>
                         </View>
                     }
