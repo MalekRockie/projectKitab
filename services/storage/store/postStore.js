@@ -47,7 +47,6 @@ const normalizePosts = (postsArray) => {
     return {entities, postIds};
 };
 
-
 const enrichedPostsCache = new Map();
 
 
@@ -84,6 +83,22 @@ const enrichPost = (postId, entities) => {
     return enrichedPost;
 };
 
+const initialState = {
+    entities: {
+        posts: {},
+        users: {},
+        postblocks: {},
+    },
+    feeds: {
+        foryou: [],
+        following: [],
+        community: {},
+    },
+    pagination: {
+        foryou: { page: 1, hasNext: false, totalPosts: 0 },
+        following: { page: 1, hasNext: false, totalPosts: 0 },
+    },
+};
 
 export const usePStore = create(
     persist(
@@ -185,7 +200,8 @@ export const usePStore = create(
                 }));
             },
 
-            
+            reset: () => set(initialState),
+
         }),
 
         {

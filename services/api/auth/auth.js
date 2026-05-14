@@ -1,6 +1,8 @@
 import { publicApi } from "../base";
 import { useUTStore } from "../../storage/store/tstore";
 import { MMKVLoader } from "react-native-mmkv-storage";
+import { usePStore } from "../../storage/store/postStore";
+import { useCUserStore } from "../../storage/store/cUserStore";
 
 const api = publicApi;
 const MMKV = new MMKVLoader()
@@ -22,6 +24,7 @@ export const auth = async (eml, pswrd) => {
 
 export const reAuth = async () => {
     const rtoken = await MMKV.getStringAsync("refreshToken");
+    if(!rtoken) return false;
     console.log("attempting to refresh");
     try {
         const response = await api.post('/api/v1/refreshtoken', {
@@ -32,16 +35,24 @@ export const reAuth = async () => {
         MMKV.setString("authToken", response.data.access_token);
         MMKV.setString("refreshToken", response.data.refresh_token);
         console.log("Refresh Token: ", MMKV.getString("refreshToken"));
-        return "response.data.token";
+        return true;
     } catch(error) {
         console.error("ReAuth Error: ", error.response.data.error);
+        useUTStore.getState().logout();
+        return false;
     }
 }
 
 
-
 export const Logout = () => {
+    useUTStore.getState().logout(); 
     MMKV.removeItem("authToken");
-    useUTStore.getState().logout();
-    console.log("User logged out");
-}
+    MMKV.removeItem("refreshToken");
+    
+    setTimeout(() => {
+        useCUserStore.persist.clearStorage();
+        useCUserStore.getState().clearProfile();
+        usePStore.persist.clearStorage();
+        usePStore.getState().reset();
+    }, 500);
+};

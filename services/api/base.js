@@ -32,6 +32,8 @@ export const privateApi =  axios.create({
 });
 
 privateApi.interceptors.request.use(req => {
+    const token = useUTStore.getState().userToken;
+    if (!token) return Promise.reject(new Error("No auth token, skipping request"));
     req.headers['Accept'] = 'application/json';
     req.headers['Authorization'] = `Bearer ${useUTStore.getState().userToken}`;
     
@@ -70,7 +72,8 @@ privateApi.interceptors.response.use(
         try {
             // console.log("Unauthorized attempt tp refresh token");
             const response = await reAuth();
-            // console.log("token refreshed: ", response);
+            console.log("token refreshed: ", response);
+            if(!response) return
             const newToken = useUTStore.getState().userToken;
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             processQ(null, newToken);
