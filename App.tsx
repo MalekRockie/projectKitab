@@ -11,6 +11,7 @@ import { SplashScreen } from './components/splashScreen';
 import { useUTStore } from './services/storage/store/tstore';
 import { getStoredToken } from './services/auth/checkAuth';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { RegistrationScreen } from './screens/SignUp/RegistrationScreen';
 
 const Stack = createStackNavigator();
 
@@ -53,7 +54,10 @@ function App(){
         screenOptions={{ headerShown: false,animation: 'default', gestureEnabled: false}}>
 
           {!isAuth ? (
-            <Stack.Screen name={"Login"} component={LoginScreen}/>
+            <>
+              <Stack.Screen name={"Login"} component={LoginScreen}/>
+              <Stack.Screen name={"Registration"} component={RegistrationScreen}/>
+            </>
           ) : (
             <>
               <Stack.Screen name={"MainApp"} component={MainAppNavigator}/>
