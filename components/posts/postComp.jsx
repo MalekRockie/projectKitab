@@ -1,4 +1,4 @@
-import React, { memo, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from '../../services/storage/store/postStore';
@@ -9,11 +9,15 @@ import { TextInput } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PostComponent = memo(({ postId }) => {
+
+    
     const post = usePStore(
         state => state.getPost(postId),
         shallow
     );
-    const [isLiked, setIsLiked] = useState(post.isLiked);
+    
+
+    const [isLiked, setIsLiked] = useState(false);
     const updatePost = usePStore(state => state.updatePost);
     const [expanded, setExpanded] = useState(false);
     const navigation = useNavigation();
@@ -31,6 +35,11 @@ const PostComponent = memo(({ postId }) => {
         setIsLiked(!isLiked);
     }
 
+    useEffect(() => {
+    if (post?.isLiked !== undefined) {
+        setIsLiked(post.isLiked);
+    }
+    }, [post?.isLiked]);
     
     const toggleExpand = () => setExpanded(!expanded);
 
