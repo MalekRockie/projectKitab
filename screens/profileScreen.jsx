@@ -19,7 +19,7 @@ export const ProfileScreen = () => {
 
     useEffect(() => {
         getCurrentUser(updateProfile);
-    })
+    }, []);
     return (
         <View style={styles.container}>
             <View style={styles.header}>
