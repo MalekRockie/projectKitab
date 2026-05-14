@@ -10,6 +10,7 @@ type UserProfile = {
     createdAt: Date;
     updatedAt: Date;
     profilePic: string;
+    onboardingCompleted: boolean;
 }
 
 type CurrentUserStore = UserProfile & {
@@ -24,6 +25,7 @@ const initialState: UserProfile = {
     createdAt: new Date(),
     updatedAt: new Date(),
     profilePic: "",
+    onboardingCompleted: false,
 };
 
 export const useCUserStore = create<CurrentUserStore>()(
