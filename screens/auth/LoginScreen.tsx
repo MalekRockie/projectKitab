@@ -9,14 +9,11 @@ import {
 } from 'react-native';
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import LoginForm from '../../components/auth/LoginForm';
-import api from '../../services/api/base';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/navigation';
 import { MMKVLoader } from "react-native-mmkv-storage";
 import { auth } from '../../services/api/auth/auth';
+import { authenticate } from '../../services/auth/checkAuth';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC = () => {
 
@@ -26,19 +23,13 @@ export const LoginScreen: React.FC = () => {
   };
   const MMKV = new MMKVLoader().initialize();
 
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation();
   const [isLoading, setIsLoading] = React.useState(false);
 
   const loginCred = async (data: {emailaddess: string; password: string}) => {
     setIsLoading(true);
     try {
-      await auth(data.emailaddess, data.password);
-    } catch (error) {
-      console.log("email: ", data.emailaddess);
-      console.log("password: ", data.password);
-      console.log("MMKV Token: ", MMKV.getString("authToken"));
-      console.log("Error: ", error);
-      
+      await authenticate(data.emailaddess, data.password);
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +58,7 @@ export const LoginScreen: React.FC = () => {
         <View style={styles.registerContainer}>
           <Text
             style={[styles.linkText, { color: isDarkMode ? Colors.light : Colors.dark }]}
-            onPress={() => console.log('Register pressed')}>
+            onPress={() => navigation.navigate('Registration')}>
             Don't have an account? Register now
           </Text>
         </View>

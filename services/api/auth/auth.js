@@ -10,16 +10,19 @@ const MMKV = new MMKVLoader()
     .initialize();
 
 export const auth = async (eml, pswrd) => {
-    await api.post('/api/v1/login', {
-        email: eml,
-        password: pswrd
-    }).then(response => {
+    try {
+        const response = await api.post('/api/v1/login', {
+            email: eml,
+            password: pswrd
+        });
         MMKV.setString("authToken", response.data.token.access_token);
         MMKV.setString("refreshToken", response.data.token.refresh_token);
         useUTStore.getState().login(response.data.token.access_token);
-    }).catch(error => {
+        return true;
+    } catch (error) {
         console.error("Auth Error: ", error.response.data.error);
-    });
+        return false;
+    }
 }
 
 export const reAuth = async () => {
