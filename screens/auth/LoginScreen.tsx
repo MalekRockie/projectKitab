@@ -11,7 +11,6 @@ import { Colors } from 'react-native/Libraries/NewAppScreen';
 import LoginForm from '../../components/auth/LoginForm';
 import { useNavigation } from '@react-navigation/native';
 import { MMKVLoader } from "react-native-mmkv-storage";
-import { auth } from '../../services/api/auth/auth';
 import { authenticate } from '../../services/auth/checkAuth';
 
 
