@@ -1,10 +1,12 @@
 import { useNavigation } from "@react-navigation/native";
-import { Image, StyleSheet, Text, TouchableOpacity, View, Button, Dimensions, Pressable } from "react-native";
+import { Image, StyleSheet, Text, View, Dimensions, Pressable, Platform } from "react-native";
 import { useCUserStore } from "../../services/storage/store/cUserStore";
-import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withSpring, withTiming, Easing, withRepeat, withSequence, withDelay, withDecay, withClamp, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useEffect, useState } from "react";
-import Icon from 'react-native-vector-icons/Ionicons';
+import { useEffect } from "react";
+import {DropdownMenu} from '../MenuButton/DropDownMenu.jsx'
+import Icon from 'react-native-vector-icons/Entypo';
+import { Logout } from "../../services/api/auth/auth";
 
 
 const SIDEBAR_TABS = [
@@ -17,15 +19,47 @@ const SIDEBAR_TABS = [
 
 export const Sidebar = ({visible, onClose, onOpen}) => {
 
+    let windowWidth = Dimensions.get('window').width;
+
     const offset = useSharedValue(windowWidth);
     const pressed = useSharedValue(false);
-    let windowWidth = Dimensions.get('window').width;
     const startOffset = useSharedValue(windowWidth);
-    // const [shouldSnapRight, setShouldSnapRight] = useState(true);
     const navigation = useNavigation();
 
+    const redirect = (stack, screen) => {
+        navigation.navigate(stack, { screen: screen })
+    };
 
+    const openTab = (stack, screen) => {
+        offset.value = withTiming(windowWidth, {}, (finished) => {
+            if (finished) {
+                runOnJS(onClose)();
+                runOnJS(redirect)(stack, screen);
+            }
+        });
+    };
 
+    const menuItems = [
+        {
+            id: 'settings',
+            label: 'Settings & Privacy',
+            icon: 'settings-outline',
+            onPress: () => openTab('MainApp', 'Settings'),
+        },
+        {
+            id: 'help',
+            label: 'Help & Support',
+            icon: 'help-circle-outline',
+            onPress: () => console.log('Navigate to help'),
+        },
+        {
+            id: 'logout',
+            label: 'Log Out',
+            icon: 'log-out-outline',
+            onPress: () => Logout(),
+            isDestructive: true,
+        },
+    ];
 
     useEffect(() => {
         offset.value = withTiming(visible ? 0 : windowWidth);
@@ -36,7 +70,6 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
         transform: [
             { translateX: Math.max(0, offset.value) },
         ],
-        // backgroundColor: pressed.value ? '#FFE04B' : '#b58df1',
     }));
 
     const ShadowAnimation = useAnimatedStyle(() => ({
@@ -52,8 +85,6 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
         .onChange((event) => {
             const newValue = startOffset.value + event.translationX;
             offset.value = Math.max(0, Math.min((windowWidth * 0.8), newValue));
-            // console.log(((offset.value -(windowWidth * 0.97)) / (windowWidth * 0.97)) * 0.5);
-
         })
         .onFinalize((event) => {
             pressed.value = false;
@@ -64,38 +95,17 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
             const vis = visible;
             if(shouldSnapRight) {
                 runOnJS(onClose)();
-                // console.log("open: ", shouldSnapRight)
             } else if(!shouldSnapRight) {
                 runOnJS(onOpen)();
-                // console.log("close: ", shouldSnapRight)
             }
             if(vis == visible){
                 offset.value = withTiming(shouldSnapRight ? (windowWidth * 1) : 0, {
                 });
             }
-            // console.log(((offset.value -(windowWidth * 0.97)) / (windowWidth * 0.97)) * 0.5);
         });
 
-
-
-    const openTab = (stack, screen) => {
-        offset.value = withTiming(windowWidth, {}, (finished) => {
-            if (finished) {
-                runOnJS(onClose)();
-                runOnJS(redirect)(stack, screen);
-            }
-        });
-    };
-
-    const redirect = (stack, screen) => {
-        // console.log("Reached", stack);
-        // console.log("Reached", screen);
-        navigation.navigate(stack, { screen: screen })
-    };
     const toggleSidebar = (() => {
-            // offset.value = withSpring(visible ? (windowWidth * 0.85) : -20);
             visible ? onClose() : onOpen();
-            // console.log("Visible: ",visible);
     })
 
     return(
@@ -111,17 +121,37 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
                         <View style={styles.sidebarTabsContainer}>
                             {SIDEBAR_TABS.map(({ label, stack, screen }) => (
                                 <Pressable
-                                    key={label}
-                                    onPress={() => openTab(stack, screen)}
-                                    android_disableSound={true}
-                                    style={({ pressed }) => [styles.sidebarBtns, { backgroundColor: pressed ? '#3e3e3e62' : '#29292905' }]}>
+                                key={label}
+                                onPress={() => openTab(stack, screen)}
+                                android_disableSound={true}
+                                style={({ pressed }) => [styles.sidebarBtns, { backgroundColor: pressed ? '#3e3e3e62' : '#29292905' }]}>
                                     <Text style={styles.sidebarBtnsText}>{label}</Text>
                                 </Pressable>
                             ))}
                         </View>
-                        {/* <Pressable style={styles.menuButton}>
-                            <Icon name="ellipsis-horizontal-circle-outline" size={24} color="white" />
-                        </Pressable> */}
+
+                        <View style={styles.bottomMenuWrapper}>
+                            <DropdownMenu
+                                items={menuItems}
+                                align="stretch"
+                                position="top"
+                                triggerStyle={styles.sidebarBtns}
+                                trigger={
+                                    <View style={styles.menuTriggerContent}>
+                                        <View>
+                                            <Text>
+                                                
+                                            </Text>
+                                        </View>
+                                        <Icon 
+                                            name="dots-three-horizontal"
+                                            size={20}
+                                            color={'#ffffff'}
+                                        />
+                                    </View>
+                                }
+                            />
+                        </View>
                     </View>
                 </Animated.View>
             </GestureDetector>
@@ -134,7 +164,7 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
                     android_disableSound={true}
                     onPress={toggleSidebar}>
                     <Animated.View style={[ShadowAnimation, { height: '100%', width: '100%' }]} 
-                        pointerEvents="none" // This prevents the animated view from blocking touches
+                        pointerEvents="none"
                     />
                 </Pressable>
             )}
@@ -142,9 +172,7 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
     )
     
     function CustomDrawerContent() {        
-
         return (
-            // <DrawerContentScrollView {...props} style={{ backgroundColor: '#0e0e0e' }}>
             <View style={{
                 padding: 20,
                 borderBottomWidth: 1,
@@ -157,18 +185,7 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
                         { opacity: pressed ? 0.5 : 1.0 }
                     ]}
                     android_disableSound={true}
-                    onPress={() => 
-                    {
-                    offset.value = withTiming(windowWidth, {}, (finished) => {
-                        if (finished) {
-                            runOnJS(onClose)();
-                            runOnJS(redirect)();
-                        }
-                    }) 
-                    openTab('MainApp', 'Profile' )
-                    }
-                    
-                    }>
+                    onPress={() => openTab('MainApp', 'Profile')}>
                     <Image
                     source={require('../../icons/avatarB.png')}
                     style={{
@@ -186,56 +203,38 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
                 Follower 122 • Following 10
                 </Text>
             </View>
-            
-            // <DrawerItemList {...props} />
-            // </DrawerContentScrollView>
         );
     };
-
-
-    // function Menu () {
-    //     return(
-    //         <View style={styles.menuContainer}>
-    //             <Text>Hi</Text>
-    //         </View>
-    //     )
-    // }
 }
 
 const styles = StyleSheet.create({
     container: {
         zIndex: 2,
-        // backgroundColor: '#ff0000ff',
         height: '100%',
         width: '90%',
         right: 0,
         position: 'absolute',
-
     },
     sidebarEdge: {
         height: '100%',
-        // backgroundColor: '#1313133b',
         width: '90%',
     },
     sidebarContainer: {
+        flex: 1,
         height: '100%',
         width: '100%',
-        // flex: 1,
         backgroundColor: '#131313ff',
-
     },
     sidebarShadow: {
         height: '100%',
         width: '100%',
     },
     sidebarTabsContainer:{
-        // backgroundColor: '#ff0000ff',
-        marginTop: '50',
+        marginTop: 50,
         gap: 18,
-        
     },
     sidebarBtns: {
-        backgroundColor: '#ff000062',
+        backgroundColor: '#2626266c',
         borderRadius: 15,
         width: '95%',
         margin: 'auto',
@@ -246,25 +245,24 @@ const styles = StyleSheet.create({
         padding: 30,
         paddingTop: 5,
         paddingBottom: 5,
-        // fontWeight: '10',
         fontFamily: Platform.select({
             ios: 'System',
             android: 'Roboto',
             default: 'System',
         }),
     },
-    // menuButton:{
-    //     position: 'absolute',
-    //     top: 20,
-    //     right: 30
-    // },
-    // menuContainer:{
-    //     backgroundColor: 'black',
-    //     height: 150,
-    //     width: 120
-    // }
+    bottomMenuWrapper: {
+        width: '100%',
+        marginTop: 'auto',
+        paddingBottom: Platform.select({ ios: 30, android: 20, default: 20 }),
+    },
+    menuTriggerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+    },
 });
-
 
 
 export default Sidebar
