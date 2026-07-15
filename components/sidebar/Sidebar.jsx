@@ -6,15 +6,16 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useEffect } from "react";
 import {DropdownMenu} from '../MenuButton/DropDownMenu.jsx'
 import Icon from 'react-native-vector-icons/Entypo';
+import IconF from 'react-native-vector-icons/Feather';
 import { Logout } from "../../services/api/auth/auth";
 
 
 const SIDEBAR_TABS = [
-    { label: 'Home', stack: 'MainApp', screen: 'Home' },
-    { label: 'Messages', stack: 'MainApp', screen: 'Messages' },
-    { label: 'Bookmarks', stack: 'MainApp', screen: 'Bookmarks' },
-    { label: 'Profile', stack: 'MainApp', screen: 'Profile' },
-    { label: 'Settings', stack: 'MainApp', screen: 'Settings' },
+    { label: 'Home', stack: 'MainApp', screen: 'Home', icon: 'home' },
+    { label: 'Circles', stack: 'MainApp', screen: 'Messages', icon: 'message-circle' },
+    { label: 'Bookmarks', stack: 'MainApp', screen: 'Bookmarks', icon: 'bookmark' },
+    { label: 'Profile', stack: 'MainApp', screen: 'Profile', icon:'user' },
+    { label: 'Settings', stack: 'MainApp', screen: 'Settings', icon: 'settings' },
 ];
 
 export const Sidebar = ({visible, onClose, onOpen}) => {
@@ -119,13 +120,19 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
                     <View style={styles.sidebarContainer}>
                         <CustomDrawerContent/>
                         <View style={styles.sidebarTabsContainer}>
-                            {SIDEBAR_TABS.map(({ label, stack, screen }) => (
+                            {SIDEBAR_TABS.map(({ label, stack, screen, icon }) => (
                                 <Pressable
                                 key={label}
                                 onPress={() => openTab(stack, screen)}
                                 android_disableSound={true}
                                 style={({ pressed }) => [styles.sidebarBtns, { backgroundColor: pressed ? '#3e3e3e62' : '#29292905' }]}>
-                                    <Text style={styles.sidebarBtnsText}>{label}</Text>
+                                    <Text style={styles.sidebarBtnsText}>
+                                        <IconF 
+                                            name={icon}
+                                            size={25}
+                                            color={'#ffffff'}
+                                        />
+                                        {'  '}{label}</Text>
                                 </Pressable>
                             ))}
                         </View>
@@ -140,7 +147,7 @@ export const Sidebar = ({visible, onClose, onOpen}) => {
                                     <View style={styles.menuTriggerContent}>
                                         <View>
                                             <Text>
-                                                
+
                                             </Text>
                                         </View>
                                         <Icon 
