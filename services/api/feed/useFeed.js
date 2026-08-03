@@ -2,6 +2,11 @@ import { privateApi } from "../base";
 import { usePStore } from "../../storage/store/postStore";
 import { useState } from "react";
 
+const FEED_ENDPOINTS = {
+    following: '/api/p/v1/feed/personalized',
+    foryou: '/api/p/v1/feed/for-you',
+};
+
 export const useFeed = (feedKey = 'foryou') => {
     const [isLoading, setIsLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -26,15 +31,14 @@ export const useFeed = (feedKey = 'foryou') => {
             const currentPage = pagination[feedKey]?.page || 1;
             const targetPage = isRefresh ? 1 : currentPage + 1;
             
+            const endpoint = FEED_ENDPOINTS[feedKey] || FEED_ENDPOINTS.foryou;
+            
             const response = await privateApi.get(
-                `/api/p/v1/feed/personalized?page=${targetPage}&limit=20`
+                `${endpoint}?page=${targetPage}&limit=20&refresh=${isRefresh}`
             );
 
             const postIds = addPosts(response.data, feedKey);
             
-            // console.log(response.data);
-            // console.log('Feed key:', feedKey);
-            // console.log('Post IDs returned from addPosts:', postIds);
             return response.data;
         } catch (err) {
             const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch posts';
@@ -49,7 +53,6 @@ export const useFeed = (feedKey = 'foryou') => {
     const refresh = () => fetchFeed(true);
     const loadMore = () => fetchFeed(false);
 
-    
     const hasNext = pagination[feedKey]?.hasNext || false;
 
     return {

@@ -22,6 +22,7 @@ const normalizePosts = (postsArray) => {
             editedAt: post.edited_at,
             isLiked: post.is_liked,
             blockIds: post.postblocks.map(block => block.id),
+            layout_mode: post.layout_mode,
         };
         
         entities.users[post.user_id] = {
