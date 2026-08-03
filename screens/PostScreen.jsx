@@ -1,13 +1,23 @@
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable, RefreshControl, StatusBar, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from "../services/storage/store/postStore";
 import { useNavigation } from "@react-navigation/native";
-import { createComment, getCommentReplies, getPostComments, togglePostLike } from "../services/api/feed/post/post";
-import { FlatList, RefreshControl } from "react-native-gesture-handler";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { getCommentReplies, getPostComments, togglePostLike } from "../services/api/feed/post/post";
+import { FlatList } from "react-native-gesture-handler";
+import GalleryViewer from "../components/Media/GalleryViewer";
+import CustomSocialVideoPlayer from "../components/Media/CustomSocialVideoPlayer";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+
+const OPTIONS = [
+    { name: 'Most Recent', value: 'recent' },
+    { name: 'Top Comments', value: 'top' },
+];
+
+const getBlockType = (block) => block.blockType || block.block_type;
 
 const getTimeAgo = (dateString) => {
     const now = new Date();
@@ -20,28 +30,34 @@ const getTimeAgo = (dateString) => {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays <= 2) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
     });
 };
 
-const CommentItem = ({ comment, renderBlock, post }) => {
+const CommentItem = React.memo(({ comment, renderBlock, post }) => {
     const [isPressed, setIsPressed] = useState(false);
     const pressTimer = useRef(null);
     const navigation = useNavigation();
+
+    // TODO: not wired to any UI yet — intended for an expandable replies thread.
     const fetchReplies = async (commentID) => {
         const response = await getCommentReplies(commentID);
         console.log(response);
-    }
+    };
 
-    const naviageToComment = async() =>{
-        navigation.navigate("MainApp", {screen: 'CommentScreen', params: { comment, post }})
-    }
-    // console.log(comment.created_at);
+    const navigateToComment = () => {
+        navigation.navigate('MainApp', { screen: 'CommentScreen', params: { comment, post } });
+    };
+
+    useEffect(() => {
+        return () => clearTimeout(pressTimer.current);
+    }, []);
+
     return (
-        <Pressable 
+        <Pressable
             android_disableSound={true}
             onPressIn={() => {
                 pressTimer.current = setTimeout(() => {
@@ -52,7 +68,7 @@ const CommentItem = ({ comment, renderBlock, post }) => {
                 clearTimeout(pressTimer.current);
                 setIsPressed(false);
             }}
-            onPress={() => navigation.navigate("MainApp", {screen: 'CommentScreen', params: { comment, post }})}
+            onPress={navigateToComment}
             style={[commentStyles.container, { backgroundColor: isPressed ? "#e0e0e0" : "#FFFFFF" }]}>
             <View style={commentStyles.header}>
                 <Image
@@ -67,53 +83,158 @@ const CommentItem = ({ comment, renderBlock, post }) => {
 
             {comment.blocks.map(renderBlock)}
 
-            
             <View style={commentStyles.actionBar}>
-                <TouchableOpacity 
-                onPress={() => (console.log("open comment input screen"))}
-                style={commentStyles.actionButton}>
+                <TouchableOpacity
+                    onPress={() => console.log("open comment input screen")}
+                    style={commentStyles.actionButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reply to comment"
+                >
                     <Icon name="chat-bubble-outline" size={16} color="#888" />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton}>
+                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
                     <Icon name="repeat" size={16} color="#888" />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton}>
+                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Like comment">
                     <Icon name="favorite-border" size={16} color="#888" />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton}>
+                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark comment">
                     <Icon name="bookmark-border" size={16} color="#888" />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton}>
+                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Share comment">
                     <Icon name="share" size={16} color="#888" />
                 </TouchableOpacity>
             </View>
         </Pressable>
     );
+});
+
+// A single grid cell — an image, or a video thumbnail with a play badge.
+// overlayCount, when set, replaces the play badge with a "+N" overlay
+// (used on the last visible cell when there are more than 4 media items).
+const MediaCell = ({ block, style, overlayCount, onPress }) => {
+    const isVideo = getBlockType(block) === 'video';
+    const showPlayBadge = isVideo && overlayCount == null;
+
+    return (
+        <Pressable
+            onPress={onPress}
+            style={[mediaGridStyles.cell, style]}
+            accessibilityRole="button"
+            accessibilityLabel={isVideo ? 'Play video' : 'View image'}
+        >
+            {isVideo && !block.thumbnailUrl ? (
+                <View style={mediaGridStyles.videoPlaceholder} />
+            ) : (
+                <Image
+                    source={{ uri: isVideo ? block.thumbnailUrl : block.content }}
+                    style={mediaGridStyles.cellImage}
+                    resizeMode="cover"
+                />
+            )}
+            {showPlayBadge && (
+                <View style={mediaGridStyles.playBadge}>
+                    <Icon name="play-arrow" size={22} color="#fff" />
+                </View>
+            )}
+            {overlayCount != null && (
+                <View style={mediaGridStyles.moreOverlay}>
+                    <Text style={mediaGridStyles.moreOverlayText}>+{overlayCount}</Text>
+                </View>
+            )}
+        </Pressable>
+    );
+};
+
+// Same arrangement rules as the feed card's MediaGallery (1 full width, 2
+// side by side, 3 one-big-two-stacked, 4+ as a 2x2 with a "+N" overlay),
+// ported here and extended so video blocks are valid grid cells too. Every
+// cell is individually tappable and opens the fullscreen GalleryViewer at
+// its correct index. Only used in gallery layout mode.
+const MediaGrid = ({ media, onPressItem }) => {
+    const count = media.length;
+    if (count === 0) return null;
+
+    const renderCell = (block, style, overlayCount = null) => (
+        <MediaCell
+            key={block.id}
+            block={block}
+            style={style}
+            overlayCount={overlayCount}
+            onPress={() => onPressItem(block.id)}
+        />
+    );
+
+    if (count === 1) {
+        return (
+            <View style={mediaGridStyles.container}>
+                {renderCell(media[0], mediaGridStyles.single)}
+            </View>
+        );
+    }
+
+    if (count === 2) {
+        return (
+            <View style={[mediaGridStyles.container, mediaGridStyles.row]}>
+                {renderCell(media[0], [mediaGridStyles.rowCell, mediaGridStyles.gapRight])}
+                {renderCell(media[1], mediaGridStyles.rowCell)}
+            </View>
+        );
+    }
+
+    if (count === 3) {
+        return (
+            <View style={[mediaGridStyles.container, mediaGridStyles.row]}>
+                {renderCell(media[0], [mediaGridStyles.rowCell, mediaGridStyles.gapRight])}
+                <View style={mediaGridStyles.rowCell}>
+                    {renderCell(media[1], mediaGridStyles.half)}
+                    {renderCell(media[2], [mediaGridStyles.half, { marginTop: 3 }])}
+                </View>
+            </View>
+        );
+    }
+
+    // 4 or more: 2x2 grid, "+N" overlay on the last visible cell if there are extras.
+    const visible = media.slice(0, 4);
+    const extraCount = count - 4;
+    return (
+        <View style={[mediaGridStyles.container, mediaGridStyles.grid]}>
+            {visible.map((block, i) => {
+                const isLastCell = i === 3 && extraCount > 0;
+                return renderCell(block, mediaGridStyles.gridCell, isLastCell ? extraCount : null);
+            })}
+        </View>
+    );
 };
 
 export const PostScreen = ({ route }) => {
-
-
     const post = route.params?.post;
     const [refreshing, setRefreshing] = useState(false);
-    const [isLiked, setIsLiked] = useState(route.params?.post.isLiked);
+    const [isLiked, setIsLiked] = useState(post?.isLiked);
     const updatePost = usePStore(state => state.updatePost);
     const navigation = useNavigation();
-    // const [newComment, setNewComment] = useState('');
     const [postComments, setPostComments] = useState();
+    const [galleryViewerVisible, setGalleryViewerVisible] = useState(false);
+    const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
     const [dropdownVisible, setDropdownVisible] = useState(false);
-    const [selectedOption, setSelectedOption] = useState({name:'Top Comments', value: 'top'});
+    const [selectedOption, setSelectedOption] = useState(OPTIONS[1]);
     const [dropdownPos, setDropdownPos] = useState({ x: 0, y: 0, width: 0, height: 0 });
     const buttonRef = useRef(null);
 
-    const options = [{
-        name: 'Most Recent',
-        value: 'recent'
-    },
-    {
-        name:'Top Comments', 
-        value: 'top'
-    }];
+    // 'gallery' → caption + grid layout. Anything else ('inline', missing,
+    // etc.) → blocks render in original authored order, text/media interleaved.
+    const isGalleryMode = post?.layout_mode === 'gallery';
+
+    // Guarded against post being undefined — these still run before the
+    // early return below since hooks can't be called conditionally.
+    const mediaBlocks = useMemo(
+        () => post?.postblocks?.filter(b => getBlockType(b) === 'image' || getBlockType(b) === 'video') ?? [],
+        [post]
+    );
+    const textBlocks = useMemo(
+        () => post?.postblocks?.filter(b => getBlockType(b) === 'text') ?? [],
+        [post]
+    );
 
     const handleOpenDropdown = () => {
         buttonRef.current?.measureInWindow((x, y, width, height) => {
@@ -128,18 +249,28 @@ export const PostScreen = ({ route }) => {
         fetchComments(option);
     };
 
-
-    const fetchComments = async (option) => {
-        if (option == null) option = selectedOption;
+    const fetchComments = async (option = selectedOption) => {
         const response = await getPostComments(post.id, option.value);
         setPostComments(response.comments);
-        if (response.total_count != post.total_count) {
+        if (response.total_count !== post.commentCount) {
             updatePost(post.id, { commentCount: response.total_count });
-            post.total_count = response.total_count;
         }
     };
 
+    // Finds the block's index within the POST's own mediaBlocks. Only
+    // correct for the post's own media — never call this with a comment's
+    // block id, since it won't be found and will silently fall back to 0.
+    const openGallery = (blockId) => {
+        const correctIndex = mediaBlocks.findIndex(b => b.id === blockId);
+        setGalleryInitialIndex(correctIndex >= 0 ? correctIndex : 0);
+        setGalleryViewerVisible(true);
+        // StatusBar.setHidden(true);
+    };
 
+    const closeGallery = () => {
+        setGalleryViewerVisible(false);
+        // StatusBar.setHidden(false);
+    };
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -151,56 +282,112 @@ export const PostScreen = ({ route }) => {
         fetchComments();
     }, []);
 
-    // useEffect(() => {
-    //     console.log(postComments);
-    // }, [postComments]);
-
-    const likePost = () => {
-        try{
-            const like = togglePostLike(post.id, post.likesCount, updatePost);
-        } 
-        catch (err){
+    const handleLikePress = async () => {
+        const previousLiked = isLiked;
+        setIsLiked(!previousLiked); // optimistic update
+        try {
+            await togglePostLike(post.id, post.likesCount, updatePost);
+        } catch (err) {
             console.log(err);
+            setIsLiked(previousLiked); // roll back on failure
         }
-        setIsLiked(!isLiked);
-    }
+    };
 
-    // const makeComment = () => {
-    //     const newComment = {
-    //         parent_comment_id: null,
-    //         blocks: [
-    //                 {
-    //                     Type: "text",
-    //                     Content: newComment
-    //                 }
-    //         ]
-    //     }
-    //     createComment(post.id, newComment);
-    //     setNewComment('')
-    // }
-
-    
-    // const toggleExpand = () => setExpanded(!expanded);
-
-    if (!post) return null;
-    
-
-    const renderBlock = (block) => {
-        const type = block.blockType || block.block_type;
-        const content = block.content;
-
+    // Renders the POST's own top-level blocks (both gallery-mode caption
+    // text and inline-mode interleaved blocks route through here). Media
+    // is wrapped to open the fullscreen GalleryViewer at the correct index
+    // — safe because mediaBlocks here is guaranteed to be the post's own.
+    const renderPostBlock = useCallback((block) => {
+        const type = getBlockType(block);
         switch (type) {
             case 'text':
                 return (
                     <View style={styles.content} key={block.id}>
-                        <Text style={styles.textBlock}>{content}</Text>
+                        <Text style={styles.textBlock}>{block.content}</Text>
                     </View>
+                );
+            case 'image':
+                return (
+                    <Pressable
+                        key={block.id}
+                        onPress={() => openGallery(block.id)}
+                        style={styles.mediaWrapper}
+                    >
+                        <Image
+                            source={{ uri: block.content }}
+                            style={styles.inlineMedia}
+                            resizeMode="cover"
+                        />
+                        {mediaBlocks[0]?.id === block.id && mediaBlocks.length > 1 && (
+                            <View style={styles.galleryIndicator}>
+                                <Icon name="photo-library" size={20} color="#fff" />
+                            </View>
+                        )}
+                    </Pressable>
+                );
+            case 'video':
+                return (
+                    <Pressable
+                        key={block.id}
+                        onPress={() => openGallery(block.id)}
+                        style={styles.mediaWrapper}
+                    >
+                        <View pointerEvents="none">
+                            <CustomSocialVideoPlayer block={block} post={post} />
+                        </View>
+                        {mediaBlocks[0]?.id === block.id && mediaBlocks.length > 1 && (
+                            <View style={styles.galleryIndicator}>
+                                <Icon name="photo-library" size={20} color="#fff" />
+                            </View>
+                        )}
+                    </Pressable>
                 );
             default:
                 return null;
         }
-    };
-    
+    }, [post, mediaBlocks]);
+
+    // Renders blocks WITHIN an individual comment. Deliberately plain — no
+    // gallery-opening Pressable here. Reasons: (1) openGallery(block.id)
+    // searches the post's own mediaBlocks, which never contains a comment's
+    // block id, so it'd silently fall back to opening the post's first
+    // item; (2) wrapping media in its own Pressable would swallow the tap
+    // before it reaches CommentItem's outer Pressable, breaking "tap a
+    // comment to open its thread"; (3) leaving video un-wrapped lets
+    // CustomSocialVideoPlayer's own tap-to-play/fullscreen logic work.
+    const renderCommentBlock = useCallback((block) => {
+        const type = getBlockType(block);
+        switch (type) {
+            case 'text':
+                return (
+                    <View style={styles.content} key={block.id}>
+                        <Text style={styles.textBlock}>{block.content}</Text>
+                    </View>
+                );
+            case 'image':
+                return (
+                    <Image
+                        key={block.id}
+                        source={{ uri: block.content }}
+                        style={styles.inlineMedia}
+                        resizeMode="cover"
+                    />
+                );
+            case 'video':
+                return (
+                    <CustomSocialVideoPlayer key={block.id} block={block} post={post} />
+                );
+            default:
+                return null;
+        }
+    }, [post]);
+
+    const renderItem = useCallback(({ item }) => (
+        <CommentItem comment={item} renderBlock={renderCommentBlock} post={post} />
+    ), [renderCommentBlock, post]);
+
+    if (!post) return null;
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -220,9 +407,7 @@ export const PostScreen = ({ route }) => {
                 style={{ flex: 1 }}
                 data={postComments}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <CommentItem comment={item} renderBlock={renderBlock} post={post} />
-                )}
+                renderItem={renderItem}
                 bounces={true}
                 overScrollMode="always"
                 refreshControl={
@@ -243,9 +428,22 @@ export const PostScreen = ({ route }) => {
                                 />
                                 <Text style={styles.username}>{post.user?.username}</Text>
                             </View>
-                            <View>
-                                {post.postblocks.map(renderBlock)}
-                            </View>
+
+                            {isGalleryMode ? (
+                                <>
+                                    <View style={styles.postTextContainer}>
+                                        {textBlocks.map(renderPostBlock)}
+                                    </View>
+                                    {mediaBlocks.length > 0 && (
+                                        <MediaGrid media={mediaBlocks} onPressItem={openGallery} />
+                                    )}
+                                </>
+                            ) : (
+                                <View style={styles.postBlocksContainer}>
+                                    {post.postblocks.map(renderPostBlock)}
+                                </View>
+                            )}
+
                             <View style={styles.timestampContainer}>
                                 <Text style={styles.timestamp}>
                                     {new Date(post.createdAt).toLocaleString('en-US', {
@@ -263,21 +461,24 @@ export const PostScreen = ({ route }) => {
                                 <Pressable
                                     android_disableSound={true}
                                     style={styles.actionButton}
-                                    onPress={() => 
-                                        // console.log("open comment input screen")
-                                        navigation.navigate("MainApp", {screen: 'CommentComposerScreen', params: { post: post }})
+                                    onPress={() =>
+                                        navigation.navigate("MainApp", { screen: 'CommentComposerScreen', params: { post } })
                                     }
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Reply to post"
                                 >
                                     <Icon name="chat-bubble-outline" size={20} color="#666" />
                                     <Text style={styles.actionText}>{post.commentCount}</Text>
                                 </Pressable>
-                                <TouchableOpacity style={styles.actionButton}>
+                                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
                                     <Icon name="repeat" size={20} color="#666" />
                                     <Text style={styles.actionText}>0</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.actionButton}
-                                    onPress={() => likePost()}
+                                    onPress={handleLikePress}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={isLiked ? 'Unlike post' : 'Like post'}
                                 >
                                     <Icon
                                         name={isLiked ? "favorite" : "favorite-border"}
@@ -286,10 +487,10 @@ export const PostScreen = ({ route }) => {
                                     />
                                     <Text style={styles.actionText}>{post.likesCount}</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionButton}>
+                                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
                                     <Icon name="bookmark-border" size={20} color="#666" />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionButton}>
+                                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
                                     <Icon name="share" size={20} color="#666" />
                                 </TouchableOpacity>
                             </View>
@@ -306,13 +507,17 @@ export const PostScreen = ({ route }) => {
                         </View>
                     </>
                 }
+                ListEmptyComponent={
+                    postComments && postComments.length === 0 ? (
+                        <Text style={styles.emptyText}>No comments yet</Text>
+                    ) : null
+                }
                 ListFooterComponent={
                     <View>
-                        <Text style={{ margin: 'auto', fontSize: 28, color: '#c7c7c7',}}>•</Text>
+                        <Text style={{ margin: 'auto', fontSize: 28, color: '#c7c7c7' }}>•</Text>
                     </View>
                 }
             />
-
             {dropdownVisible && (
                 <>
                     <Pressable
@@ -328,19 +533,19 @@ export const PostScreen = ({ route }) => {
                             right: 30,
                         }
                     ]}>
-                        {options.map((option, index) => (
+                        {OPTIONS.map((option, index) => (
                             <Pressable
                                 android_disableSound={true}
                                 key={index}
                                 style={[
                                     styles.dropdownOption,
-                                    selectedOption === option && styles.selectedOption
+                                    selectedOption.value === option.value && styles.selectedOption
                                 ]}
                                 onPress={() => handleSelectOption(option)}
                             >
                                 <Text style={[
                                     styles.dropdownText,
-                                    selectedOption === option.name && styles.selectedText
+                                    selectedOption.value === option.value && styles.selectedText
                                 ]}>
                                     {option.name}
                                 </Text>
@@ -349,18 +554,35 @@ export const PostScreen = ({ route }) => {
                     </View>
                 </>
             )}
+
+            {galleryViewerVisible && (
+                <Modal
+                    visible={galleryViewerVisible}
+                    animationType="none"
+                    transparent={true}
+                    statusBarTranslucent={true}
+                    onRequestClose={closeGallery}
+                >
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <GalleryViewer
+                            mediaBlocks={mediaBlocks}
+                            initialIndex={galleryInitialIndex}
+                            post={post}
+                            onClose={closeGallery}
+                        />
+                    </GestureHandlerRootView>
+                </Modal>
+            )}
         </View>
     );
 };
 
-
 const styles = StyleSheet.create({
-    container:{
+    container: {
         flex: 1,
     },
     postContainer: {
         backgroundColor: '#fff',
-        // marginBottom: 0,
         padding: 15,
         paddingBottom: 0,
         width: '100%',
@@ -372,16 +594,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         paddingBottom: 10,
         height: 50,
-        zIndex:1,
+        zIndex: 1,
     },
     headerText: {
-        // backgroundColor: 'rgb(228, 2, 2)',
-        margin:'auto',
+        margin: 'auto',
         marginLeft: 10,
-        // textAlign:'center',
-        // height:'auto',
         fontSize: 18,
-        fontWeight:'500'
+        fontWeight: '500'
     },
     backButton: {
         marginLeft: 10,
@@ -405,6 +624,12 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 16,
     },
+    postTextContainer: {
+        marginBottom: 4,
+    },
+    postBlocksContainer: {
+        marginBottom: 4,
+    },
     timestampContainer: {
         borderBottomWidth: 1,
         borderBottomColor: '#eaeaea',
@@ -416,27 +641,36 @@ const styles = StyleSheet.create({
     },
     content: {
         marginBottom: 8,
-        // width: '94%',
         padding: 5,
-        paddingRight: 50,
         paddingBottom: 0
     },
     textBlock: {
-        // backgroundColor: '#dd0000ff',
         fontSize: 15,
         lineHeight: 20,
-        // marginBottom: 0,
     },
     readMore: {
         color: '#1a73e8',
         marginTop: 4,
         fontWeight: '500',
     },
-    media: {
-        width: SCREEN_WIDTH - 24,
-        height: 300,
+    inlineMedia: {
+        width: '100%',
+        height: 180,
         borderRadius: 8,
-        marginBottom: 8,
+        marginTop: 4,
+        marginBottom: 4,
+    },
+    mediaWrapper: {
+        position: 'relative',
+    },
+    galleryIndicator: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     footer: {
         borderBottomWidth: 1,
@@ -445,36 +679,37 @@ const styles = StyleSheet.create({
     },
     actionBar: {
         flexDirection: 'row',
-        // borderTopWidth: 1,
-        // borderTopColor: '#eee',
         borderBottomWidth: 1,
         borderBottomColor: '#eaeaea',
-        // padding: 10,
         paddingTop: 10,
         paddingBottom: 10,
         gap: 56,
-        // margin: 'auto',
         width: '100%',
-        // backgroundColor: 'rgb(215, 0, 0)',
-        alignItems:'center',
+        alignItems: 'center',
         marginBottom: 0,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: 5,
-        // marginLeft: 10,
     },
     actionText: {
         marginLeft: 4,
         color: '#666',
     },
+    emptyText: {
+        textAlign: 'center',
+        color: '#666',
+        fontSize: 14,
+        marginTop: 24,
+        marginBottom: 12,
+    },
     textInput: {
-            backgroundColor: '#ff0000ff',
-            padding: 10,
-            borderColor: '#000',
-            borderWidth: 1,
-            margin: 12,
+        backgroundColor: '#ff0000ff',
+        padding: 10,
+        borderColor: '#000',
+        borderWidth: 1,
+        margin: 12,
     },
     commentInputWrapper: {
         flexDirection: 'row',
@@ -570,6 +805,73 @@ const styles = StyleSheet.create({
     },
 });
 
+const mediaGridStyles = StyleSheet.create({
+    container: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginVertical: 8,
+    },
+    row: {
+        flexDirection: 'row',
+        height: 240,
+    },
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        height: 280,
+    },
+    cell: {
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    single: {
+        width: '100%',
+        height: 400,
+    },
+    rowCell: {
+        flex: 1,
+        height: '100%',
+    },
+    gapRight: {
+        marginRight: 3,
+    },
+    half: {
+        flex: 1,
+        width: '100%',
+    },
+    gridCell: {
+        width: '50%',
+        height: '50%',
+        padding: 1.5,
+    },
+    cellImage: {
+        width: '100%',
+        height: '100%',
+    },
+    videoPlaceholder: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#000',
+    },
+    playBadge: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.25)',
+    },
+    moreOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    moreOverlayText: {
+        color: '#fff',
+        fontSize: 22,
+        fontWeight: '700',
+    },
+});
+
 const commentStyles = StyleSheet.create({
     container: {
         paddingHorizontal: 12,
@@ -605,12 +907,9 @@ const commentStyles = StyleSheet.create({
     actionBar: {
         flexDirection: 'row',
         marginTop: 8,
-        gap: '60',
-        // backgroundColor: '#ff0000',
+        gap: 60,
     },
     actionButton: {
         padding: 4,
-        // margin:'auto',
-        // marginLeft: 10,
     },
 });
