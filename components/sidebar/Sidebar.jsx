@@ -18,11 +18,12 @@ const SIDEBAR_TABS = [
     { label: 'Settings', stack: 'MainApp', screen: 'Settings', icon: 'settings' },
 ];
 
-export const Sidebar = ({visible, onClose, onOpen}) => {
+export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
 
     let windowWidth = Dimensions.get('window').width;
 
-    const offset = useSharedValue(windowWidth);
+    const internalOffset = useSharedValue(windowWidth);
+    const offset = sidebarOffset ?? internalOffset;
     const pressed = useSharedValue(false);
     const startOffset = useSharedValue(windowWidth);
     const navigation = useNavigation();
