@@ -12,6 +12,9 @@ export const Datefield: React.FC<DatefieldProps> = ({
 }) => {
     const [open, setOpen] = useState(false);
 
+    const pickerDate = date || new Date();
+
+
     return (
         <View>
             <Text style={styles.label}>
@@ -28,13 +31,15 @@ export const Datefield: React.FC<DatefieldProps> = ({
                 onPress={() => setOpen(!open)}
                 style={styles.pressable}
             >
-                <Text>{getformatDateUS(date)}</Text>
+                <Text style={date ? styles.dateText : styles.placeholderText}>
+                    {date ? getformatDateUS(date) : "Select date"}
+                </Text>
             </Pressable>
             <DatePicker
                 modal
                 mode="date"
                 open={open}
-                date={date}
+                date={pickerDate}
                 onConfirm={(selectedDate) => {
                     setOpen(false);
                     onChange?.(selectedDate);
@@ -63,5 +68,13 @@ const styles = StyleSheet.create({
         height: 40,
         paddingHorizontal: 10,
         justifyContent: "center",
+    },
+    dateText: {
+        fontSize: 16,
+        color: "#000", // Standard text color
+    },
+    placeholderText: {
+        fontSize: 16,
+        color: "#999", // Greyed out color for empty state
     },
 });

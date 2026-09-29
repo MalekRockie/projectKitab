@@ -5,6 +5,7 @@ import { Logout } from '../services/api/auth/auth';
 import { useCUserStore } from '../services/storage/store/cUserStore';
 import { getCurrentUser } from '../services/api/user/currentUser';
 import Icon from 'react-native-vector-icons/Ionicons';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 
 export const ProfileScreen = () => {
@@ -22,34 +23,15 @@ export const ProfileScreen = () => {
     }, []);
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Pressable
-                    android_disableSound={true}
-                    style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.5 : 1.0 }]}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Icon name="arrow-back" size={24} color="black" />
-                </Pressable>
-                <View
-                    style={styles.pageTitleContainer}>
-                    <Text style={styles.pageTitle}>
-                        {useCUserStore((state) => state.username)}
-                    </Text>
-                    <Text>
-                        150 posts
-                    </Text>
-                </View>
-                {/* <TouchableOpacity
-                    title="Open Drawer"
-                    onPress={() => navigation.toggleDrawer()}
-                    style={styles.hamburgerButtonContainer}
-                    >
-                    <Image 
-                        style={styles.hamburgerButton}
-                        source={require('../icons/burger-menu.png')}
-                        />
-                </TouchableOpacity> */}
-            </View>
+            <ScreenHeader
+                title={useCUserStore((state) => state.username)}
+                subtitle="150 posts"
+                rightElement={
+                    <Pressable onPress={() => navigation.toggleDrawer()}>
+                    <Image style={styles.hamburgerButton} source={require('../icons/burger-menu.png')} />
+                    </Pressable>
+                }
+            />
 
             <View
                 style={styles.pageContainer}>

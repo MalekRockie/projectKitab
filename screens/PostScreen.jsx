@@ -8,6 +8,7 @@ import { getCommentReplies, getPostComments, togglePostLike } from "../services/
 import { FlatList } from "react-native-gesture-handler";
 import GalleryViewer from "../components/Media/GalleryViewer";
 import CustomSocialVideoPlayer from "../components/Media/CustomSocialVideoPlayer";
+import ScreenHeader from "../components/common/ScreenHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -390,18 +391,8 @@ export const PostScreen = ({ route }) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Pressable
-                    android_disableSound={true}
-                    style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.5 : 1.0 }]}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Icon name="arrow-back" size={24} color="black" />
-                </Pressable>
-                <Text style={styles.headerText}>
-                    {post.user?.username}'s post
-                </Text>
-            </View>
+
+            <ScreenHeader title={`${post.user?.username}'s post`} />
 
             <FlatList
                 style={{ flex: 1 }}
