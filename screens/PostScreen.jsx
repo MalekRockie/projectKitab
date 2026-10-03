@@ -593,18 +593,19 @@ const styles = StyleSheet.create({
         width: '100%',
         flexDirection: 'row',
         paddingBottom: 10,
-        height: 50,
+        height: 100,
         zIndex: 1,
     },
     headerText: {
         margin: 'auto',
         marginLeft: 10,
+        marginTop: 70,
         fontSize: 18,
-        fontWeight: '500'
+        fontWeight: '0'
     },
     backButton: {
         marginLeft: 10,
-        marginTop: 10,
+        marginTop: 70,
         borderRadius: 50,
     },
     postHeader: {

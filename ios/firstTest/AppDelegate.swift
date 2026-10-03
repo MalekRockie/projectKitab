@@ -21,13 +21,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "firstTest",
-      in: window,
-      launchOptions: launchOptions
-    )
+    // No window creation, no startReactNative — SceneDelegate handles that now
 
     return true
   }
