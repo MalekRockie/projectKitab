@@ -186,7 +186,8 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
                 borderBottomWidth: 1,
                 borderBottomColor: '#333',
                 alignItems: 'center',
-                marginBottom: 10
+                marginBottom: 10,
+                marginTop: 90,
             }}>
                 <Pressable
                     style={({ pressed }) => [
