@@ -14,6 +14,8 @@ import { shallow } from 'zustand/shallow';
 
 export const TimelineScreen = ({ tabType = 'foryou' }) => {
     const hasInitialFetch = useRef(false);
+    const endReachedForScroll = useRef(false);
+    const isUserScrolling = useRef(false);
     
     const {
         isLoading,
@@ -38,11 +40,30 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         }
     }, [tabType]);
 
-    const handleEndReached = () => {
-        if (hasNext && !isLoading && !isRefreshing) {
-        loadMore();
+    const handleScroll = useCallback(({ nativeEvent }) => {
+        const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+        const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
+        if (isUserScrolling.current && distanceFromEnd > 80) {
+            endReachedForScroll.current = false;
         }
-    };
+    }, []);
+
+    const handleScrollBegin = useCallback(() => {
+        isUserScrolling.current = true;
+    }, []);
+
+    const handleScrollEnd = useCallback(() => {
+        isUserScrolling.current = false;
+    }, []);
+
+    const handleEndReached = useCallback(() => {
+        if (endReachedForScroll.current || !hasNext || isLoading || isRefreshing) {
+            return;
+        }
+
+        endReachedForScroll.current = true;
+        loadMore().catch(() => {});
+    }, [hasNext, isLoading, isRefreshing, loadMore]);
 
     const renderPost = useCallback(({ item: postId }) => (
         <PostComponent postId={postId} />
@@ -94,7 +115,13 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
                 renderItem={renderPost}
                 keyExtractor={(postId) => postId.toString()}
                 onEndReached={handleEndReached}
-                onEndReachedThreshold={0.5}
+                onScrollBeginDrag={handleScrollBegin}
+                onScrollEndDrag={handleScrollEnd}
+                onMomentumScrollBegin={handleScrollBegin}
+                onMomentumScrollEnd={handleScrollEnd}
+                onScroll={handleScroll}
+                onEndReachedThreshold={0.1}
+                scrollEventThrottle={16}
                 ListFooterComponent={renderFooter}
                 ListEmptyComponent={renderEmpty}
                 refreshControl={

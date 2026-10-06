@@ -1,6 +1,6 @@
 import { privateApi } from "../base";
 import { usePStore } from "../../storage/store/postStore";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 const FEED_ENDPOINTS = {
     following: '/api/p/v1/feed/personalized',
@@ -11,6 +11,7 @@ export const useFeed = (feedKey = 'foryou') => {
     const [isLoading, setIsLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState(null);
+    const requestInFlight = useRef(false);
 
     const {
         getFeedPosts,
@@ -19,6 +20,12 @@ export const useFeed = (feedKey = 'foryou') => {
     } = usePStore();
 
     const fetchFeed = async (isRefresh = false) => {
+        const latestPagination = usePStore.getState().pagination[feedKey];
+        if (requestInFlight.current || (!isRefresh && !latestPagination?.hasNext)) {
+            return;
+        }
+
+        requestInFlight.current = true;
         try {
             if (isRefresh) {
                 setIsRefreshing(true);
@@ -28,7 +35,7 @@ export const useFeed = (feedKey = 'foryou') => {
             
             setError(null);
 
-            const currentPage = pagination[feedKey]?.page || 1;
+            const currentPage = latestPagination?.page || 1;
             const targetPage = isRefresh ? 1 : currentPage + 1;
             
             const endpoint = FEED_ENDPOINTS[feedKey] || FEED_ENDPOINTS.foryou;
@@ -45,6 +52,7 @@ export const useFeed = (feedKey = 'foryou') => {
             setError(errorMessage);
             throw err;
         } finally {
+            requestInFlight.current = false;
             setIsLoading(false);
             setIsRefreshing(false);
         }

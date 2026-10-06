@@ -147,7 +147,7 @@ export const usePStore = create(
                             ...state.pagination, 
                             [feedKey]: {
                                 page: pagination.page,
-                                hasNext: pagination.has_next,
+                                hasNext: pagination.has_next && posts.length > 0,
                                 totalPosts: pagination.total_posts,
                             }
                         }
