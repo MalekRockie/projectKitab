@@ -1,15 +1,26 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Pressable, Dimensions } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Pressable, Dimensions, StatusBar } from 'react-native';
 import { TimelineScreen } from './TimelineScreen';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, { SharedValue, useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useTheme } from '../theme/useTheme';
+import { ThemeColors, darkColors } from '../theme/colors';
 
 const routes = [
     { key: 'following', title: 'Following' },
     { key: 'foryou', title: 'For you' },
 ];
 
-export const HomeScreen = ({ visible, onOpenSidebar, sidebarOffset }) => {
+interface HomeScreenProps {
+    onOpenSidebar: () => void;
+    sidebarOffset: SharedValue<number>;
+}
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOffset }) => {
+    const colors = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
+    const isDark = colors === darkColors;
+    
     const windowWidth = Dimensions.get('window').width;
 
     const [tabIndex, setTabIndex] = useState(1);
@@ -20,7 +31,7 @@ export const HomeScreen = ({ visible, onOpenSidebar, sidebarOffset }) => {
 
     const toggleSidebar = () => onOpenSidebar();
 
-    const goToTab = (index) => {
+    const goToTab = (index: number) => {
         pagerX.value = withTiming(-index * windowWidth);
         setTabIndex(index);
     };
@@ -72,14 +83,23 @@ export const HomeScreen = ({ visible, onOpenSidebar, sidebarOffset }) => {
     }));
 
     return (
-        <View style={{ flex: 1 }}>
+        <View style={styles.container}>
+            <StatusBar
+                barStyle={isDark ? 'light-content' : 'dark-content'}
+                backgroundColor={colors.surface}
+            />
+            
             <View style={styles.header}>
                 <Pressable
                     android_disableSound={true}
                     onPress={toggleSidebar}
                     style={({ pressed }) => [styles.hamburgerButtonContainer, { opacity: pressed ? 0.5 : 1.0 }]}
                 >
-                    <Image style={styles.hamburgerButton} source={require('../icons/burger-menu.png')} />
+                    {/* Added tintColor assuming your icon is a monochrome template image */}
+                    <Image 
+                        style={[styles.hamburgerButton, { tintColor: colors.text }]} 
+                        source={require('../icons/burger-menu.png')} 
+                    />
                 </Pressable>
             </View>
 
@@ -90,7 +110,9 @@ export const HomeScreen = ({ visible, onOpenSidebar, sidebarOffset }) => {
                         style={[styles.tab, tabIndex === index && styles.selectedTab]}
                         onPress={() => goToTab(index)}
                     >
-                        <Text>{tab.title}</Text>
+                        <Text style={[styles.tabText, tabIndex === index && styles.selectedTabText]}>
+                            {tab.title}
+                        </Text>
                     </TouchableOpacity>
                 ))}
             </View>
@@ -99,7 +121,7 @@ export const HomeScreen = ({ visible, onOpenSidebar, sidebarOffset }) => {
                 <GestureDetector gesture={pan}>
                     <Animated.View style={[{ flex: 1, flexDirection: 'row', width: windowWidth * routes.length }, pagerStyle]}>
                         {routes.map((tab) => (
-                            <View key={tab.key} style={{ width: windowWidth }}>
+                            <View key={tab.key} style={{ width: windowWidth, backgroundColor: colors.background }}>
                                 <TimelineScreen tabType={tab.key} />
                             </View>
                         ))}
@@ -110,39 +132,59 @@ export const HomeScreen = ({ visible, onOpenSidebar, sidebarOffset }) => {
     );
 };
 
-const styles = StyleSheet.create({
-    header:{
-        marginTop: 0,
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: colors.surface,
+    },
+    header: {
+        marginTop: 50,
+        backgroundColor: colors.surface,
         width: '100%',
         flexDirection: 'row',
         paddingBottom: 10,
-        height: 50
+        height: 50,
+        justifyContent: 'flex-end', // Pushes hamburger to the right
+        alignItems: 'center',
     },
     tabsContainer: {
         justifyContent: 'center',
         display: 'flex',
-        flexDirection: 'row'
+        flexDirection: 'row',
+        backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.divider,
     },
     tab: {
         padding: 10,
-        paddingBottom: 5,
-        paddingTop: 5
-    },
+        paddingBottom: 8,
+        paddingTop: 8,
+    }, 
     selectedTab: {
         borderBottomWidth: 2,
-        borderBottomColor: '#00e5ffff'
+        // Replaced hardcoded '#00e5ffff' with theme text color. 
+        // If you add a 'primary' brand color to your theme later, use that here!
+        borderBottomColor: colors.text, 
+    },
+    tabText: {
+        color: colors.textSecondary,
+        fontWeight: '500',
+    },
+    selectedTabText: {
+        color: colors.text,
+        fontWeight: '600',
     },
     hamburgerButton: {
-        padding: 10,
-        width: 32,
-        height: 32,
-        borderRadius: 50
+        width: 24,
+        height: 24,
+        // tintColor is applied inline inside the JSX
     },
     hamburgerButtonContainer: {
-        margin: 'auto',
         marginRight: 20,
         width: 32,
-        height: 32
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 

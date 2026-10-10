@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, Pressable, RefreshControl, StatusBar, Modal } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Pressable, RefreshControl, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from "../services/storage/store/postStore";
 import { useNavigation } from "@react-navigation/native";
@@ -8,9 +8,8 @@ import { getCommentReplies, getPostComments, togglePostLike } from "../services/
 import { FlatList } from "react-native-gesture-handler";
 import GalleryViewer from "../components/Media/GalleryViewer";
 import CustomSocialVideoPlayer from "../components/Media/CustomSocialVideoPlayer";
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
+import ScreenHeader from "../components/common/ScreenHeader";
+import { useTheme } from '../theme/useTheme';
 
 const OPTIONS = [
     { name: 'Most Recent', value: 'recent' },
@@ -41,6 +40,8 @@ const CommentItem = React.memo(({ comment, renderBlock, post }) => {
     const [isPressed, setIsPressed] = useState(false);
     const pressTimer = useRef(null);
     const navigation = useNavigation();
+    const colors = useTheme();
+    const styles = useMemo(() => createCommentStyles(colors), [colors]);
 
     // TODO: not wired to any UI yet — intended for an expandable replies thread.
     const fetchReplies = async (commentID) => {
@@ -69,40 +70,40 @@ const CommentItem = React.memo(({ comment, renderBlock, post }) => {
                 setIsPressed(false);
             }}
             onPress={navigateToComment}
-            style={[commentStyles.container, { backgroundColor: isPressed ? "#e0e0e0" : "#FFFFFF" }]}>
-            <View style={commentStyles.header}>
+            style={[styles.container, { backgroundColor: isPressed ? colors.iconBg : colors.surface }]}>
+            <View style={styles.header}>
                 <Image
                     source={comment.user_avatar ? { uri: comment.user_avatar } : require('../icons/avatar.png')}
-                    style={commentStyles.avatar}
+                    style={[styles.avatar, { borderColor: colors.divider }]}
                 />
-                <Text style={commentStyles.username}>{comment.user?.username}</Text>
-                <Text style={commentStyles.timestamp}>
+                <Text style={styles.username}>{comment.user?.username}</Text>
+                <Text style={styles.timestamp}>
                     • {getTimeAgo(comment.created_at)}
                 </Text>
             </View>
 
             {comment.blocks.map(renderBlock)}
 
-            <View style={commentStyles.actionBar}>
+            <View style={styles.actionBar}>
                 <TouchableOpacity
                     onPress={() => console.log("open comment input screen")}
-                    style={commentStyles.actionButton}
+                    style={styles.actionButton}
                     accessibilityRole="button"
                     accessibilityLabel="Reply to comment"
                 >
-                    <Icon name="chat-bubble-outline" size={16} color="#888" />
+                    <Icon name="chat-bubble-outline" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
-                    <Icon name="repeat" size={16} color="#888" />
+                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
+                    <Icon name="repeat" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Like comment">
-                    <Icon name="favorite-border" size={16} color="#888" />
+                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Like comment">
+                    <Icon name="favorite-border" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark comment">
-                    <Icon name="bookmark-border" size={16} color="#888" />
+                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark comment">
+                    <Icon name="bookmark-border" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={commentStyles.actionButton} accessibilityRole="button" accessibilityLabel="Share comment">
-                    <Icon name="share" size={16} color="#888" />
+                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share comment">
+                    <Icon name="share" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
             </View>
         </Pressable>
@@ -213,6 +214,8 @@ export const PostScreen = ({ route }) => {
     const [isLiked, setIsLiked] = useState(post?.isLiked);
     const updatePost = usePStore(state => state.updatePost);
     const navigation = useNavigation();
+    const colors = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [postComments, setPostComments] = useState();
     const [galleryViewerVisible, setGalleryViewerVisible] = useState(false);
     const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
@@ -249,23 +252,23 @@ export const PostScreen = ({ route }) => {
         fetchComments(option);
     };
 
-    const fetchComments = async (option = selectedOption) => {
+    const fetchComments = useCallback(async (option = OPTIONS[1]) => {
         const response = await getPostComments(post.id, option.value);
         setPostComments(response.comments);
         if (response.total_count !== post.commentCount) {
             updatePost(post.id, { commentCount: response.total_count });
         }
-    };
+    }, [post, updatePost]);
 
     // Finds the block's index within the POST's own mediaBlocks. Only
     // correct for the post's own media — never call this with a comment's
     // block id, since it won't be found and will silently fall back to 0.
-    const openGallery = (blockId) => {
+    const openGallery = useCallback((blockId) => {
         const correctIndex = mediaBlocks.findIndex(b => b.id === blockId);
         setGalleryInitialIndex(correctIndex >= 0 ? correctIndex : 0);
         setGalleryViewerVisible(true);
         // StatusBar.setHidden(true);
-    };
+    }, [mediaBlocks]);
 
     const closeGallery = () => {
         setGalleryViewerVisible(false);
@@ -274,13 +277,13 @@ export const PostScreen = ({ route }) => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchComments();
+        await fetchComments(selectedOption);
         setRefreshing(false);
     };
 
     useEffect(() => {
         fetchComments();
-    }, []);
+    }, [fetchComments]);
 
     const handleLikePress = async () => {
         const previousLiked = isLiked;
@@ -345,7 +348,7 @@ export const PostScreen = ({ route }) => {
             default:
                 return null;
         }
-    }, [post, mediaBlocks]);
+    }, [post, mediaBlocks, styles, openGallery]);
 
     // Renders blocks WITHIN an individual comment. Deliberately plain — no
     // gallery-opening Pressable here. Reasons: (1) openGallery(block.id)
@@ -380,7 +383,7 @@ export const PostScreen = ({ route }) => {
             default:
                 return null;
         }
-    }, [post]);
+    }, [post, styles]);
 
     const renderItem = useCallback(({ item }) => (
         <CommentItem comment={item} renderBlock={renderCommentBlock} post={post} />
@@ -390,18 +393,8 @@ export const PostScreen = ({ route }) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Pressable
-                    android_disableSound={true}
-                    style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.5 : 1.0 }]}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Icon name="arrow-back" size={24} color="black" />
-                </Pressable>
-                <Text style={styles.headerText}>
-                    {post.user?.username}'s post
-                </Text>
-            </View>
+
+            <ScreenHeader title={`${post.user?.username}'s post`} titleInBackButton />
 
             <FlatList
                 style={{ flex: 1 }}
@@ -414,8 +407,8 @@ export const PostScreen = ({ route }) => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#1a1a1a']}
-                        tintColor={'#1a1a1a'}
+                        colors={[colors.accent]}
+                        tintColor={colors.accent}
                     />
                 }
                 ListHeaderComponent={
@@ -467,11 +460,11 @@ export const PostScreen = ({ route }) => {
                                     accessibilityRole="button"
                                     accessibilityLabel="Reply to post"
                                 >
-                                    <Icon name="chat-bubble-outline" size={20} color="#666" />
+                                    <Icon name="chat-bubble-outline" size={20} color={colors.textSecondary} />
                                     <Text style={styles.actionText}>{post.commentCount}</Text>
                                 </Pressable>
                                 <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
-                                    <Icon name="repeat" size={20} color="#666" />
+                                    <Icon name="repeat" size={20} color={colors.textSecondary} />
                                     <Text style={styles.actionText}>0</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
@@ -483,15 +476,15 @@ export const PostScreen = ({ route }) => {
                                     <Icon
                                         name={isLiked ? "favorite" : "favorite-border"}
                                         size={20}
-                                        color={isLiked ? "#ff4444" : "#666"}
+                                        color={isLiked ? colors.danger : colors.textSecondary}
                                     />
                                     <Text style={styles.actionText}>{post.likesCount}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
-                                    <Icon name="bookmark-border" size={20} color="#666" />
+                                    <Icon name="bookmark-border" size={20} color={colors.textSecondary} />
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
-                                    <Icon name="share" size={20} color="#666" />
+                                    <Icon name="share" size={20} color={colors.textSecondary} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -502,7 +495,7 @@ export const PostScreen = ({ route }) => {
                                 style={styles.CommentTreeHeaderButton}
                                 onPress={handleOpenDropdown}
                             >
-                                <Text>{selectedOption.name}</Text>
+                                <Text style={styles.dropdownText}>{selectedOption.name}</Text>
                             </Pressable>
                         </View>
                     </>
@@ -514,7 +507,7 @@ export const PostScreen = ({ route }) => {
                 }
                 ListFooterComponent={
                     <View>
-                        <Text style={{ margin: 'auto', fontSize: 28, color: '#c7c7c7' }}>•</Text>
+                        <Text style={{ margin: 'auto', fontSize: 28, color: colors.textSecondary }}>•</Text>
                     </View>
                 }
             />
@@ -577,19 +570,20 @@ export const PostScreen = ({ route }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: colors.background,
     },
     postContainer: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         padding: 15,
         paddingBottom: 0,
         width: '100%',
     },
     header: {
         marginTop: 0,
-        backgroundColor: '#f4f4f4ff',
+        backgroundColor: colors.surface,
         width: '100%',
         flexDirection: 'row',
         paddingBottom: 10,
@@ -619,11 +613,12 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         marginRight: 10,
         borderWidth: 1,
-        borderColor: '#161616ff'
+        borderColor: colors.divider
     },
     username: {
         fontWeight: 'bold',
         fontSize: 16,
+        color: colors.text,
     },
     postTextContainer: {
         marginBottom: 4,
@@ -633,11 +628,11 @@ const styles = StyleSheet.create({
     },
     timestampContainer: {
         borderBottomWidth: 1,
-        borderBottomColor: '#eaeaea',
+        borderBottomColor: colors.divider,
         paddingBottom: 10
     },
     timestamp: {
-        color: '#666',
+        color: colors.textSecondary,
         fontSize: 14,
     },
     content: {
@@ -648,9 +643,10 @@ const styles = StyleSheet.create({
     textBlock: {
         fontSize: 15,
         lineHeight: 20,
+        color: colors.text,
     },
     readMore: {
-        color: '#1a73e8',
+        color: colors.accent,
         marginTop: 4,
         fontWeight: '500',
     },
@@ -675,13 +671,13 @@ const styles = StyleSheet.create({
     },
     footer: {
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        borderBottomColor: colors.divider,
         paddingTop: 8,
     },
     actionBar: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderBottomColor: '#eaeaea',
+        borderBottomColor: colors.divider,
         paddingTop: 10,
         paddingBottom: 10,
         gap: 56,
@@ -696,19 +692,19 @@ const styles = StyleSheet.create({
     },
     actionText: {
         marginLeft: 4,
-        color: '#666',
+        color: colors.textSecondary,
     },
     emptyText: {
         textAlign: 'center',
-        color: '#666',
+        color: colors.textSecondary,
         fontSize: 14,
         marginTop: 24,
         marginBottom: 12,
     },
     textInput: {
-        backgroundColor: '#ff0000ff',
+        backgroundColor: colors.surface,
         padding: 10,
-        borderColor: '#000',
+        borderColor: colors.divider,
         borderWidth: 1,
         margin: 12,
     },
@@ -719,9 +715,9 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderTopWidth: 1,
         borderBottomWidth: 1,
-        borderTopColor: '#efefef',
-        borderBottomColor: '#efefef',
-        backgroundColor: '#fff',
+        borderTopColor: colors.divider,
+        borderBottomColor: colors.divider,
+        backgroundColor: colors.surface,
         gap: 8,
     },
     commentAvatar: {
@@ -737,14 +733,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 8,
         fontSize: 14,
-        color: '#1a1a1a',
+        color: colors.text,
         lineHeight: 20,
     },
     sendButton: {
         width: 50,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#1a1a1a',
+        backgroundColor: colors.accent,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -753,9 +749,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     CommentTreeHeader: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#eaeaea',
+        borderBottomColor: colors.divider,
     },
     CommentTreeHeaderButton: {
         margin: 'auto',
@@ -767,7 +763,7 @@ const styles = StyleSheet.create({
     },
     dropdownArrow: {
         fontSize: 12,
-        color: '#666',
+        color: colors.textSecondary,
     },
     modalOverlay: {
         flex: 1,
@@ -776,7 +772,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     dropdownContainer: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         minWidth: 110,
         shadowColor: '#000',
         shadowOffset: {
@@ -792,14 +788,14 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 6,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        borderBottomColor: colors.divider,
     },
     selectedOption: {
-        backgroundColor: '#f0f0f0',
+        backgroundColor: colors.iconBg,
     },
     dropdownText: {
         fontSize: 14,
-        color: '#333',
+        color: colors.text,
     },
     selectedText: {
         fontWeight: '600',
@@ -873,13 +869,13 @@ const mediaGridStyles = StyleSheet.create({
     },
 });
 
-const commentStyles = StyleSheet.create({
+const createCommentStyles = (colors) => StyleSheet.create({
     container: {
         paddingHorizontal: 12,
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-        backgroundColor: '#fff',
+        borderBottomColor: colors.divider,
+        backgroundColor: colors.surface,
     },
     header: {
         flexDirection: 'row',
@@ -891,19 +887,21 @@ const commentStyles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
+        borderWidth: 1,
     },
     username: {
         fontWeight: 'bold',
         fontSize: 14,
+        color: colors.text,
     },
     timestamp: {
-        color: '#888',
+        color: colors.textSecondary,
         fontSize: 12,
     },
     body: {
         fontSize: 14,
         lineHeight: 20,
-        color: '#1a1a1a',
+        color: colors.text,
     },
     actionBar: {
         flexDirection: 'row',

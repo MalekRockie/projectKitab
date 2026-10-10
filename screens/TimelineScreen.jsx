@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
     View, 
     FlatList, 
@@ -11,11 +11,14 @@ import { useFeed } from '../services/api/feed/useFeed';
 import { usePStore } from '../services/storage/store/postStore';
 import PostComponent from '../components/posts/postComp';
 import { shallow } from 'zustand/shallow';
+import { useTheme } from '../theme/useTheme';
 
 export const TimelineScreen = ({ tabType = 'foryou' }) => {
     const hasInitialFetch = useRef(false);
     const endReachedForScroll = useRef(false);
     const isUserScrolling = useRef(false);
+    const colors = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     
     const {
         isLoading,
@@ -73,7 +76,7 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         if (!isLoading) return null;
         return (
         <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color="#0000ff" />
+            <ActivityIndicator size="small" color={colors.accent} />
         </View>
         );
     };
@@ -82,7 +85,7 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         if (isLoading) {
         return (
             <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator size="large" color={colors.accent} />
             </View>
         );
         }
@@ -106,7 +109,7 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
             <Text style={styles.emptyText}>No posts yet</Text>
         </View>
         );
-    }, [isLoading, error, refresh]);
+    }, [isLoading, error, refresh, styles, colors.accent]);
 
     return (
         <View style={styles.container}>
@@ -134,10 +137,10 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: colors.background,
     },
     centerContainer: {
         flex: 1,
@@ -152,17 +155,17 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontSize: 16,
-        color: '#ff0000',
+        color: colors.danger,
         marginBottom: 10,
     },
     retryText: {
         fontSize: 14,
-        color: '#0000ff',
+        color: colors.accent,
         textDecorationLine: 'underline',
     },
     emptyText: {
         fontSize: 16,
-        color: '#666',
+        color: colors.textSecondary,
     },
 });
 

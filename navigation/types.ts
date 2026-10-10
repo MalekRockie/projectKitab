@@ -12,4 +12,5 @@ export type RootStackParamList = {
     PostScreen: undefined;
     CommentScreen: undefined;
     CommentComposerScreen: undefined;
+    Theme: undefined;
 };

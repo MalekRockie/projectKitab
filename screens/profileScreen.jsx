@@ -1,17 +1,21 @@
-import React, { useEffect } from 'react';
-import { View, Text, Image, StyleSheet, Button, TouchableOpacity, Pressable } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useMemo } from 'react';
+import { View, Text, Image, StyleSheet, Button, Pressable } from 'react-native';
 import { Logout } from '../services/api/auth/auth';
 import { useCUserStore } from '../services/storage/store/cUserStore';
 import { getCurrentUser } from '../services/api/user/currentUser';
-import Icon from 'react-native-vector-icons/Ionicons';
+import ScreenHeader from '../components/common/ScreenHeader';
+import { useTheme } from '../theme/useTheme';
 
 
 export const ProfileScreen = () => {
 
-    const navigation = useNavigation();
     // const removeUserToken = useUTStore((state) => state.logout);
     const  updateProfile  = useCUserStore(state => state.updateProfile);
+    const username = useCUserStore(state => state.username);
+    const profilePic = useCUserStore(state => state.profilePic);
+    const bio = useCUserStore(state => state.bio);
+    const colors = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     const handleLogout = () => {
         Logout();
@@ -19,56 +23,29 @@ export const ProfileScreen = () => {
 
     useEffect(() => {
         getCurrentUser(updateProfile);
-    }, []);
+    }, [updateProfile]);
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Pressable
-                    android_disableSound={true}
-                    style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.5 : 1.0 }]}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Icon name="arrow-back" size={24} color="black" />
-                </Pressable>
-                <View
-                    style={styles.pageTitleContainer}>
-                    <Text style={styles.pageTitle}>
-                        {useCUserStore((state) => state.username)}
-                    </Text>
-                    <Text>
-                        150 posts
-                    </Text>
-                </View>
-                {/* <TouchableOpacity
-                    title="Open Drawer"
-                    onPress={() => navigation.toggleDrawer()}
-                    style={styles.hamburgerButtonContainer}
-                    >
-                    <Image 
-                        style={styles.hamburgerButton}
-                        source={require('../icons/burger-menu.png')}
-                        />
-                </TouchableOpacity> */}
-            </View>
+            <ScreenHeader title={username} subtitle="150 posts" />
 
             <View
                 style={styles.pageContainer}>
                 <Image
-                    source={useCUserStore((state) => state.profilePic) ? { uri: useCUserStore((state) => state.profilePic) } : styles.userPanel}
+                    source={profilePic ? { uri: profilePic } : undefined}
                     style={styles.userPanel}
                 />
                 <View
                     style={styles.innerUserHeader}>
                     <View style={{flexDirection:'row'}}>
                         <Image
-                            source={useCUserStore((state) => state.profilePic) ? { uri: useCUserStore((state) => state.profilePic) } : require('../icons/avatarB.png')}
+                            source={profilePic ? { uri: profilePic } : require('../icons/avatarB.png')}
                             style={styles.avatar}/>
                             <Pressable
                                 android_disableSound={true}
                                 style={({ pressed }) => [
                                     {
-                                    backgroundColor: pressed ? "#373737ff" : "#242424ff",
-                                    borderColor: pressed ?'#bdbdbdff': '#161616ff',
+                                    backgroundColor: pressed ? colors.iconBg : colors.surface,
+                                    borderColor: colors.divider,
                                     borderWidth: 1,
                                     borderRadius: 20,
                                     height: 35,
@@ -82,16 +59,16 @@ export const ProfileScreen = () => {
                                 onPress={() => {
                                     console.log("Edit Profile")
                                 }}>
-                                <Text style={{color: '#ffffff', alignContent: 'center', margin:'auto'}}>
+                                <Text style={{color: colors.text, alignContent: 'center', margin:'auto'}}>
                                     Edit Profile</Text>
                             </Pressable>
                     </View>
 
                     <Text style={styles.username}>
-                        {useCUserStore((state) => state.username)}
+                        {username}
                     </Text>
                     <Text style={styles.bio}>
-                        {useCUserStore((state) => state.bio)}
+                        {bio}
                     </Text>
                     <View style={styles.statsContainer}>
                         <View style={styles.stat}>
@@ -108,6 +85,7 @@ export const ProfileScreen = () => {
                     style={{fontSize: 20, color: 'green'}}
                     styleDisabled={{color: 'red'}}
                     title="Sign Out"
+                    color={colors.accent}
                     onPress={handleLogout}
                     >
                     </Button>
@@ -121,7 +99,7 @@ export const ProfileScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     pageTitleContainer: {
         marginLeft: 20,
         marginTop: 0,
@@ -135,7 +113,7 @@ const styles = StyleSheet.create({
     },
     container: {
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: colors.background,
         flex: 1,
     },
     backButton: {
@@ -160,25 +138,26 @@ const styles = StyleSheet.create({
         marginLeft: '20',
         marginBottom: 0,
         borderWidth: 3,
-        borderColor: '#161616ff'
+        borderColor: colors.divider
     },
     userPanel:{
         width: '100%',
         height: 120,
         top: 0,
         position: 'absolute',
-        backgroundColor: '#7471d0ff',
+        backgroundColor: colors.iconBg,
     },
     username: {
         fontSize: 24,
         fontWeight: 'bold',
+        color: colors.text,
         marginLeft: '20',
         marginTop: '15',
         marginBottom: 8,
     },
     bio: {
         fontSize: 16,
-        color: '#666',
+        color: colors.textSecondary,
         marginBottom: 15,
         marginLeft: '20',
 
@@ -200,23 +179,19 @@ const styles = StyleSheet.create({
     statNumber: {
         fontSize: 14,
         fontWeight: 'bold',
+        color: colors.text,
     },
     statLabel: {
         fontSize: 14,
-        color: '#888',
+        color: colors.textSecondary,
     },
     header: {
         marginTop: 0,
-        backgroundColor: '#f4f4f4ff',
+        backgroundColor: colors.surface,
         width: '100%',
         flexDirection: 'row',
         paddingBottom: 10,
         height: 50,
-    },
-    hamburgerButton: {
-        padding: 10,
-        width: 32,
-        height: 32,
     },
     hamburgerButtonContainer: {
         margin: 'auto',
@@ -226,7 +201,7 @@ const styles = StyleSheet.create({
     },
     postSection:{
         marginTop: 20,
-        borderColor: '#e8e8e8ff',
+        borderColor: colors.divider,
         borderTopWidth: 1,
         width: '100%',
         // backgroundColor: '#0077ffff',

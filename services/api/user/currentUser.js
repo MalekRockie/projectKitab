@@ -6,7 +6,7 @@ export async function getCurrentUser (updateProfile) {
         try {
             const response = await api.get('/api/p/v1/myprofile')
             const user = response.data.user;
-            // console.log(response.data)
+            console.log(response.data)
             if(response.data){
                 updateProfile({
                     userId: user.id,
@@ -23,3 +23,17 @@ export async function getCurrentUser (updateProfile) {
             return null;
         };
     };
+
+export async function getAccount () {
+    try {
+        const response = await api.get('/api/p/v1/account')
+        const user = response.data.user;
+        console.log(user)
+        if(response.data){
+            return response.data.user;
+        }
+    } catch (error){
+        console.log(error);
+        return null;
+    }
+}

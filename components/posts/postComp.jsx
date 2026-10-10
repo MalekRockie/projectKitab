@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, Pressable, Modal, StatusBar } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -7,56 +7,20 @@ import { shallow } from 'zustand/shallow';
 import { togglePostLike } from '../../services/api/feed/post/post';
 import { useNavigation } from '@react-navigation/native';
 import GalleryViewer from '../Media/GalleryViewer';
+import { useTheme } from '../../theme/useTheme';
+import { darkColors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const MAX_CONTENT_LENGTH = 250;
-
-// How tall an inline post's media preview is allowed to be before it gets
-// cropped. Deliberately shorter than the gallery's natural heights (120-140
-// below) so a peek is always visible whenever inline media exists.
 const INLINE_MEDIA_PREVIEW_HEIGHT = 90;
 
-// Planned as the future default palette — not wired in yet. When ready,
-// nothing else in this file needs to change).
-const UPCOMING_COLORS = {
-    background: '#131313',
-    backgroundPressed: '#1c1c1e',
-    divider: '#2f3336',
-    textPrimary: '#e7e9ea',
-    textSecondary: '#8b98a5',
-    border: '#232323',
-    accent: '#f4425e',
-    likeActive: '#f4425e',
-    likeInactive: '#8b98a5',
-    likePressed: 'rgba(244, 66, 94, 0.12)',
-    pillPressed: 'rgba(255, 255, 255, 0.08)',
-};
-
-// Colors currently in use throughout this file (the original light palette).
-const COLORS = {
-    background: '#FFFFFF',
-    backgroundPressed: '#e0e0e0',
-    divider: '#e6e6e6',
-    textPrimary: '#000000',
-    textSecondary: '#666666',
-    border: 'transparent',
-    accent: '#1a73e8',
-    likeActive: '#ff4444',
-    likeInactive: '#ff0000',
-    likePressed: 'rgba(255, 0, 0, 0.08)',
-    pillPressed: 'rgba(0, 0, 0, 0.06)',
-};
-
-// Formats large counts the way most feeds do (1.2K, 3.4M) instead of raw numbers.
 const formatCount = (count = 0) => {
     if (count < 1000) return `${count}`;
     if (count < 1000000) return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}K`;
     return `${(count / 1000000).toFixed(1).replace(/\.0$/, '')}M`;
 };
 
-// Relative time (3h, 2d), falling back to a short
-// date once a post is more than a week old.
 const formatRelativeTime = (dateString) => {
     const then = new Date(dateString).getTime();
     const diffSeconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
@@ -71,15 +35,8 @@ const formatRelativeTime = (dateString) => {
     return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-// Lays out 1-4+ media blocks as an album grid. 1 = full width, 2 = side by
-// side, 3 = one big + two stacked, 4+ = 2x2 with a "+N" overlay on extras.
-// When onPressItem is provided, every cell becomes tappable and opens the
-// fullscreen gallery at that item's index (gallery layout mode). When it's
-// omitted, cells render as plain, non-interactive Images so taps fall
-// through to whatever wraps this component (used for the inline mode
-// cropped preview, where the whole card is meant to be one "go to post"
-// target alongside the explicit "View post" pill below it).
-const MediaGallery = ({ media, style, onPressItem }) => {
+// Passed `styles` down as a prop so the dynamically created styles are accessible
+const MediaGallery = ({ media, style, onPressItem, styles }) => {
     const count = media.length;
     if (count === 0) return null;
 
@@ -129,7 +86,6 @@ const MediaGallery = ({ media, style, onPressItem }) => {
         );
     }
 
-    // 4 or more: 2x2 grid, with a "+N" overlay on the last visible cell if there are extras.
     const visible = media.slice(0, 4);
     const extraCount = count - 4;
     return (
@@ -170,6 +126,26 @@ const MediaGallery = ({ media, style, onPressItem }) => {
 };
 
 const PostComponent = memo(({ postId }) => {
+    const colors = useTheme();
+    const isDark = colors === darkColors;
+
+    // Derived post-specific colors replacing the old hardcoded COLORS object
+    const postColors = useMemo(() => ({
+        background: colors.surface,
+        backgroundPressed: isDark ? '#1c1c1e' : '#f0f0f0',
+        divider: colors.divider,
+        textPrimary: colors.text,
+        textSecondary: colors.textSecondary,
+        border: isDark ? '#232323' : 'transparent',
+        accent: colors.danger, // Mapped to danger as planned in your UPCOMING_COLORS
+        likeActive: colors.danger,
+        likeInactive: colors.textSecondary,
+        likePressed: colors.dangerBg,
+        pillPressed: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+    }), [colors, isDark]);
+
+    const styles = useMemo(() => createStyles(postColors), [postColors]);
+
     const post = usePStore(
         state => state.getPost(postId),
         shallow
@@ -197,7 +173,7 @@ const PostComponent = memo(({ postId }) => {
 
     const handleLikePress = async () => {
         const previousLiked = isLiked;
-        setIsLiked(!previousLiked); // optimistic update
+        setIsLiked(!previousLiked); 
         try {
             await togglePostLike(post.id, post.likesCount, updatePost);
         } catch (err) {
@@ -213,23 +189,16 @@ const PostComponent = memo(({ postId }) => {
 
     const textBlocks = post.postblocks.filter(b => b.blockType === 'text');
     const mediaBlocks = post.postblocks.filter(b => b.blockType === 'image');
-    // Legacy posts without layout_mode set fall back to 'inline'.
     const layoutMode = post.layout_mode === 'gallery' ? 'gallery' : 'inline';
-    console.log(post);
 
-    // Opens the fullscreen gallery at the tapped item's index. Only ever
-    // wired up in gallery mode — inline mode's preview stays non-interactive
-    // so the whole card keeps acting as one "go to post" target.
     const openGallery = (blockId) => {
         const correctIndex = mediaBlocks.findIndex(b => b.id === blockId);
         setGalleryInitialIndex(correctIndex >= 0 ? correctIndex : 0);
         setGalleryViewerVisible(true);
-        // StatusBar.setHidden(true);
     };
 
     const closeGallery = () => {
         setGalleryViewerVisible(false);
-        // StatusBar.setHidden(false);
     };
 
     const renderTextBlock = (block) => {
@@ -259,7 +228,7 @@ const PostComponent = memo(({ postId }) => {
                     clearTimeout(pressTimer.current);
                     setIsPressed(false);
                 }}
-                style={[styles.container, { backgroundColor: isPressed ? COLORS.backgroundPressed : COLORS.background }]}
+                style={[styles.container, { backgroundColor: isPressed ? postColors.backgroundPressed : postColors.background }]}
                 onPress={goToPost}
             >
                 <Image
@@ -278,23 +247,23 @@ const PostComponent = memo(({ postId }) => {
                     </View>
 
                     {mediaBlocks.length > 0 && layoutMode === 'gallery' && (
-                        <MediaGallery media={mediaBlocks} onPressItem={openGallery} />
+                        <MediaGallery media={mediaBlocks} onPressItem={openGallery} styles={styles} />
                     )}
 
                     {mediaBlocks.length > 0 && layoutMode === 'inline' && (
                         <>
                             <View style={styles.inlineMediaCap}>
-                                <MediaGallery media={mediaBlocks} />
+                                <MediaGallery media={mediaBlocks} styles={styles} />
                             </View>
                             <Pressable
                                 android_disableSound={true}
-                                style={({ pressed }) => [styles.viewPostButton, { backgroundColor: pressed ? COLORS.pillPressed : 'transparent' }]}
+                                style={({ pressed }) => [styles.viewPostButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
                                 onPress={goToPost}
                                 accessibilityRole="button"
                                 accessibilityLabel="View full post"
                             >
                                 <Text style={styles.viewPostText}>View post</Text>
-                                <Icon name="chevron-right" size={16} color={COLORS.accent} />
+                                <Icon name="chevron-right" size={16} color={postColors.accent} />
                             </Pressable>
                         </>
                     )}
@@ -302,23 +271,22 @@ const PostComponent = memo(({ postId }) => {
                     <View style={styles.actionBar}>
                         <Pressable
                             android_disableSound={true}
-                            style={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? COLORS.pillPressed : 'transparent' }]}
+                            style={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
                             onPress={() => navigation.navigate('MainApp', { screen: 'CommentComposerScreen', params: { post } })}
                             accessibilityRole="button"
                             accessibilityLabel="Reply to post"
                         >
-                            <Icon name="chat-bubble-outline" size={18} color={COLORS.textSecondary} />
+                            <Icon name="chat-bubble-outline" size={18} color={postColors.textSecondary} />
                             <Text style={styles.actionText}>{formatCount(post.commentCount)}</Text>
                         </Pressable>
 
                         <Pressable
                             android_disableSound={true}
-                            style={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? COLORS.pillPressed : 'transparent' }]}
+                            style={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
                             accessibilityRole="button"
                             accessibilityLabel="Repost"
-                            // TODO: wire up real repost logic + count once the API supports it
                         >
-                            <Icon name="repeat" size={18} color={COLORS.textSecondary} />
+                            <Icon name="repeat" size={18} color={postColors.textSecondary} />
                             <Text style={styles.actionText}>{formatCount(0)}</Text>
                         </Pressable>
 
@@ -326,7 +294,7 @@ const PostComponent = memo(({ postId }) => {
                             android_disableSound={true}
                             style={({ pressed }) => [
                                 styles.actionButton,
-                                { backgroundColor: isLiked || pressed ? COLORS.likePressed : 'transparent' },
+                                // { backgroundColor: isLiked || pressed ? postColors.likePressed : 'transparent' },
                             ]}
                             onPress={handleLikePress}
                             accessibilityRole="button"
@@ -335,9 +303,9 @@ const PostComponent = memo(({ postId }) => {
                             <Icon
                                 name={isLiked ? 'favorite' : 'favorite-border'}
                                 size={18}
-                                color={isLiked ? COLORS.likeActive : COLORS.likeInactive}
+                                color={isLiked ? postColors.likeActive : postColors.likeInactive}
                             />
-                            <Text style={[styles.actionText, isLiked && { color: COLORS.likeActive }]}>
+                            <Text style={[styles.actionText, isLiked && { color: postColors.likeActive }]}>
                                 {formatCount(post.likesCount)}
                             </Text>
                         </Pressable>
@@ -367,13 +335,13 @@ const PostComponent = memo(({ postId }) => {
     );
 });
 
-const styles = StyleSheet.create({
+const createStyles = (c) => StyleSheet.create({
     container: {
         flexDirection: 'row',
         padding: 12,
         width: '100%',
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.divider,
+        borderBottomColor: c.divider,
     },
     avatar: {
         width: 44,
@@ -381,7 +349,8 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         marginRight: 12,
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: c.border,
+        backgroundColor: '#fff'
     },
     body: {
         flex: 1,
@@ -394,10 +363,10 @@ const styles = StyleSheet.create({
     username: {
         fontWeight: '700',
         fontSize: 15,
-        color: COLORS.textPrimary,
+        color: c.textPrimary,
     },
     timestamp: {
-        color: COLORS.textSecondary,
+        color: c.textSecondary,
         fontSize: 13,
     },
     content: {
@@ -406,10 +375,10 @@ const styles = StyleSheet.create({
     textBlock: {
         fontSize: 15,
         lineHeight: 20,
-        color: COLORS.textPrimary,
+        color: c.textPrimary,
     },
     readMore: {
-        color: COLORS.accent,
+        color: c.accent,
         fontWeight: '600',
         fontSize: 15,
     },
@@ -482,10 +451,10 @@ const styles = StyleSheet.create({
         marginBottom: 2,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: COLORS.divider,
+        borderColor: c.divider,
     },
     viewPostText: {
-        color: COLORS.accent,
+        color: c.accent,
         fontWeight: '600',
         fontSize: 13,
     },
@@ -506,7 +475,7 @@ const styles = StyleSheet.create({
     },
     actionText: {
         fontSize: 13,
-        color: COLORS.textSecondary,
+        color: c.textSecondary,
     },
 });
 

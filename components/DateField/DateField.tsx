@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, Text, View, StyleSheet } from "react-native";
 import DatePicker from "react-native-date-picker";
 import { getformatDateUS } from "../../utils/date";
 import { DatefieldProps } from "./types";
+import { useTheme } from "../../theme/useTheme";
+import { ThemeColors } from "../../theme/colors";
+import { useUserSettingsStore } from "../../services/storage/store/useSettingsStore";
 
 export const Datefield: React.FC<DatefieldProps> = ({
     date,
@@ -11,6 +14,11 @@ export const Datefield: React.FC<DatefieldProps> = ({
     onChange,
 }) => {
     const [open, setOpen] = useState(false);
+    const colors = useTheme();
+    const themePreference = useUserSettingsStore((state) => state.theme);
+    const styles = useMemo(() => createStyles(colors), [colors]);
+    const pickerDate = date || new Date();
+
 
     return (
         <View>
@@ -28,13 +36,16 @@ export const Datefield: React.FC<DatefieldProps> = ({
                 onPress={() => setOpen(!open)}
                 style={styles.pressable}
             >
-                <Text>{getformatDateUS(date)}</Text>
+                <Text style={date ? styles.dateText : styles.placeholderText}>
+                    {date ? getformatDateUS(date) : "Select date"}
+                </Text>
             </Pressable>
             <DatePicker
                 modal
                 mode="date"
                 open={open}
-                date={date}
+                date={pickerDate}
+                theme={themePreference === "system" ? "auto" : themePreference}
                 onConfirm={(selectedDate) => {
                     setOpen(false);
                     onChange?.(selectedDate);
@@ -45,11 +56,12 @@ export const Datefield: React.FC<DatefieldProps> = ({
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     label: {
         textAlign: "left",
         fontSize: 16,
         fontWeight: "500",
+        color: colors.textSecondary,
     },
     error: {
         color: "#ed4141",
@@ -59,9 +71,17 @@ const styles = StyleSheet.create({
     pressable: {
         borderWidth: 0,
         borderBottomWidth: 1,
-        borderColor: "#ccc",
+        borderColor: colors.divider,
         height: 40,
         paddingHorizontal: 10,
         justifyContent: "center",
+    },
+    dateText: {
+        fontSize: 16,
+        color: colors.text,
+    },
+    placeholderText: {
+        fontSize: 16,
+        color: colors.textSecondary,
     },
 });

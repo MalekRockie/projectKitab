@@ -2,16 +2,21 @@ import React, { useState } from "react";
 import { ProfileScreen } from "../screens/profileScreen";
 import { HomeScreen } from "../screens/HomeScreen"; 
 import { PostScreen } from "../screens/PostScreen";
+import SettingsScreen from "../screens/SettingsScreen"
+import AccountSettingsScreen from "../screens/AccountSettingsScreen";
+import ThemeSettingsScreen from "../screens/ThemeSettingsScreen";
 import { View, Dimensions } from "react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { CommentComposer } from "../screens/CommentComposerScreen";
 import { CommentFocusScreen } from "../screens/CommentFocusScreen";
 import { useSharedValue } from "react-native-reanimated";
+import { useSettingsSync } from "../services/sync/useSettingsSync"; 
 
 const Stack = createStackNavigator();
 
 function MainAppNavigator() {
+    useSettingsSync();
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const windowWidth = Dimensions.get('window').width;
 
@@ -30,7 +35,6 @@ function MainAppNavigator() {
                     {props =>
                         <HomeScreen 
                             {...props}
-                            visible={sidebarVisible} 
                             onOpenSidebar={() => setSidebarVisible(true)}
                             sidebarOffset={sidebarOffset}
                         />
@@ -46,7 +50,9 @@ function MainAppNavigator() {
                     options={{ animation: 'slide_from_bottom' }} 
                     component={CommentComposer}/>
                 {/* <Stack.Screen name="Messages" component={ProfileScreen} /> */}
-                {/* <Stack.Screen name="Settings" component={ProfileScreen} /> */}
+                <Stack.Screen name="Settings" component={SettingsScreen} />
+                <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+                <Stack.Screen name="Theme" component={ThemeSettingsScreen} />
             </Stack.Navigator>
 
             <Sidebar 
