@@ -189,6 +189,7 @@ const PostComponent = memo(({ postId }) => {
 
     const textBlocks = post.postblocks.filter(b => b.blockType === 'text');
     const mediaBlocks = post.postblocks.filter(b => b.blockType === 'image');
+    const videoBlocks = post.postblocks.filter(b => b.blockType === 'video');
     const layoutMode = post.layout_mode === 'gallery' ? 'gallery' : 'inline';
 
     const openGallery = (blockId) => {
@@ -266,6 +267,15 @@ const PostComponent = memo(({ postId }) => {
                                 <Icon name="chevron-right" size={16} color={postColors.accent} />
                             </Pressable>
                         </>
+                    )}
+
+                    {videoBlocks.length > 0 && (
+                        <View style={styles.videoPreview}>
+                            <Icon name="play-circle-filled" size={42} color="#fff" />
+                            <Text style={styles.videoPreviewText}>
+                                {videoBlocks.length > 1 ? `${videoBlocks.length} videos` : 'Video'} · Tap to view
+                            </Text>
+                        </View>
                     )}
 
                     <View style={styles.actionBar}>
@@ -439,6 +449,20 @@ const createStyles = (c) => StyleSheet.create({
         maxHeight: INLINE_MEDIA_PREVIEW_HEIGHT,
         overflow: 'hidden',
         borderRadius: 14,
+        marginTop: 4,
+    },
+    videoPreview: {
+        height: 140,
+        marginTop: 4,
+        marginBottom: 4,
+        borderRadius: 12,
+        backgroundColor: '#171717',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    videoPreviewText: {
+        color: '#fff',
+        fontSize: 13,
         marginTop: 4,
     },
     viewPostButton: {

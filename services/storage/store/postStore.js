@@ -94,10 +94,22 @@ const initialState = {
         foryou: [],
         following: [],
         community: {},
+        profileAll: [],
+        profileMedia: [], 
+        profileVideo: [],
+        profileImages: [],
+        profileComments: [],
+        profileReplies: [],
     },
     pagination: {
         foryou: { page: 1, hasNext: false, totalPosts: 0 },
         following: { page: 1, hasNext: false, totalPosts: 0 },
+        profileAll: { page: 1, hasNext: false, totalPosts: 0 },
+        profileMedia: { page: 1, hasNext: false, totalPosts: 0 },
+        profileVideo: { page: 1, hasNext: false, totalPosts: 0 },
+        profileImages: { page: 1, hasNext: false, totalPosts: 0 },
+        profileComments: { page: 1, hasNext: false, totalPosts: 0 },
+        profileReplies: { page: 1, hasNext: false, totalPosts: 0 },
     },
 };
 
@@ -114,11 +126,23 @@ export const usePStore = create(
                 foryou: [],
                 following: [],
                 community: {},
+                profileAll: [],
+                profileMedia: [],
+                profileVideo: [],
+                profileImages: [],
+                profileComments: [],
+                profileReplies: [],
             },
 
             pagination: {
                 foryou: { page: 1, hasNext: false, totalPosts: 0},
                 following: { page: 1, hasNext: false, totalPosts: 0},
+                profileAll: { page: 1, hasNext: false, totalPosts: 0},
+                profileMedia: { page: 1, hasNext: false, totalPosts: 0},
+                profileVideo: { page: 1, hasNext: false, totalPosts: 0},
+                profileImages: { page: 1, hasNext: false, totalPosts: 0},
+                profileComments: { page: 1, hasNext: false, totalPosts: 0},
+                profileReplies: { page: 1, hasNext: false, totalPosts: 0},
             },
 
             ui: {
@@ -156,7 +180,7 @@ export const usePStore = create(
                     if(pagination.page === 1) {
                         newState.feeds[feedKey] = postIds;
                     } else {
-                        newState.feeds[feedKey] = [...state.feeds[feedKey], ...postIds];
+                        newState.feeds[feedKey] = [...(state.feeds[feedKey] || []), ...postIds];
                     }
 
                     return newState;
@@ -217,6 +241,14 @@ export const usePStore = create(
             merge: (persistedState, currentState) => ({
                 ...currentState, 
                 ...persistedState,
+                feeds: {
+                    ...currentState.feeds,
+                    ...(persistedState?.feeds || {}),
+                },
+                pagination: {
+                    ...currentState.pagination,
+                    ...(persistedState?.pagination || {}),
+                },
                 ui: currentState.ui,
             }),
         }
