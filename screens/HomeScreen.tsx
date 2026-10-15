@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Pressable, Dimensions, StatusBar } from 'react-native';
 import { TimelineScreen } from './TimelineScreen';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
@@ -10,6 +10,12 @@ const routes = [
     { key: 'following', title: 'Following' },
     { key: 'foryou', title: 'For you' },
 ];
+const TAB_BAR_HEIGHT = 40;
+const HEADER_BAR_HEIGHT = 50;
+const STATUS_BAR_HEIGHT = 50;
+const STATUS_BAR_COLLAPSE_START = TAB_BAR_HEIGHT + HEADER_BAR_HEIGHT;
+const CHROME_COLLAPSE_HEIGHT = STATUS_BAR_COLLAPSE_START + STATUS_BAR_HEIGHT;
+const SHOW_SCROLL_THRESHOLD = 20;
 
 interface HomeScreenProps {
     onOpenSidebar: () => void;
@@ -24,6 +30,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
     const windowWidth = Dimensions.get('window').width;
 
     const [tabIndex, setTabIndex] = useState(1);
+    const [isStatusBarHidden, setIsStatusBarHidden] = useState(false);
+    const activeFeedKey = useRef(routes[tabIndex].key);
+    const lastScrollY = useRef<number | null>(null);
+    const upwardDistance = useRef(0);
+    const isRevealingChrome = useRef(false);
+    const statusBarHidden = useRef(false);
+    const chromeCollapse = useSharedValue(0);
 
     const pagerX = useSharedValue(-tabIndex * windowWidth);
     const startX = useSharedValue(0);
@@ -82,47 +95,127 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
         transform: [{ translateX: pagerX.value }],
     }));
 
+    const tabsClipStyle = useAnimatedStyle(() => ({
+        height: TAB_BAR_HEIGHT - Math.min(chromeCollapse.value, TAB_BAR_HEIGHT),
+    }));
+
+    const tabsContentStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: -Math.min(chromeCollapse.value, TAB_BAR_HEIGHT) }],
+    }));
+
+    const headerClipStyle = useAnimatedStyle(() => ({
+        height: HEADER_BAR_HEIGHT - Math.max(0, Math.min(chromeCollapse.value - TAB_BAR_HEIGHT, HEADER_BAR_HEIGHT)),
+    }));
+
+    const headerContentStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: -Math.max(0, Math.min(chromeCollapse.value - TAB_BAR_HEIGHT, HEADER_BAR_HEIGHT)) }],
+    }));
+
+    const statusBarInsetStyle = useAnimatedStyle(() => {
+        const insetCollapse = Math.max(0, Math.min(chromeCollapse.value - STATUS_BAR_COLLAPSE_START, STATUS_BAR_HEIGHT));
+        return { height: STATUS_BAR_HEIGHT - insetCollapse };
+    });
+
+    const updateChromeCollapse = (nextCollapse: number) => {
+        const clampedCollapse = Math.max(0, Math.min(CHROME_COLLAPSE_HEIGHT, nextCollapse));
+        chromeCollapse.value = clampedCollapse;
+        const shouldHideStatusBar = clampedCollapse >= STATUS_BAR_COLLAPSE_START;
+        if (statusBarHidden.current !== shouldHideStatusBar) {
+            statusBarHidden.current = shouldHideStatusBar;
+            setIsStatusBarHidden(shouldHideStatusBar);
+        }
+    };
+
+    const handleTimelineScroll = (offsetY: number, feedKey: string, isActive: boolean) => {
+        if (!isActive) return;
+        if (activeFeedKey.current !== feedKey) {
+            activeFeedKey.current = feedKey;
+            lastScrollY.current = offsetY;
+            upwardDistance.current = 0;
+            isRevealingChrome.current = false;
+            return;
+        }
+        if (lastScrollY.current === null || offsetY <= 0) {
+            lastScrollY.current = Math.max(0, offsetY);
+            upwardDistance.current = 0;
+            isRevealingChrome.current = false;
+            if (offsetY <= 0) updateChromeCollapse(0);
+            return;
+        }
+
+        const delta = offsetY - lastScrollY.current;
+        lastScrollY.current = offsetY;
+        if (Math.abs(delta) < 1) return;
+
+        if (delta > 0) {
+            upwardDistance.current = 0;
+            isRevealingChrome.current = false;
+            updateChromeCollapse(chromeCollapse.value + delta);
+        } else {
+            const upwardDelta = -delta;
+            if (!isRevealingChrome.current) {
+                upwardDistance.current += upwardDelta;
+                if (upwardDistance.current < SHOW_SCROLL_THRESHOLD) return;
+                isRevealingChrome.current = true;
+                updateChromeCollapse(chromeCollapse.value - (upwardDistance.current - SHOW_SCROLL_THRESHOLD));
+                upwardDistance.current = SHOW_SCROLL_THRESHOLD;
+                return;
+            }
+            updateChromeCollapse(chromeCollapse.value - upwardDelta);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <StatusBar
+                hidden={isStatusBarHidden}
+                animated
                 barStyle={isDark ? 'light-content' : 'dark-content'}
                 backgroundColor={colors.surface}
             />
-            
-            <View style={styles.header}>
-                <Pressable
-                    android_disableSound={true}
-                    onPress={toggleSidebar}
-                    style={({ pressed }) => [styles.hamburgerButtonContainer, { opacity: pressed ? 0.5 : 1.0 }]}
-                >
-                    {/* Added tintColor assuming your icon is a monochrome template image */}
-                    <Image 
-                        style={[styles.hamburgerButton, { tintColor: colors.text }]} 
-                        source={require('../icons/burger-menu.png')} 
-                    />
-                </Pressable>
-            </View>
 
-            <View style={styles.tabsContainer}>
-                {routes.map((tab, index) => (
-                    <TouchableOpacity
-                        key={tab.key}
-                        style={[styles.tab, tabIndex === index && styles.selectedTab]}
-                        onPress={() => goToTab(index)}
+            <Animated.View style={[styles.statusBarInset, statusBarInsetStyle]} />
+            <Animated.View style={[styles.headerClip, headerClipStyle]}>
+                <Animated.View style={[styles.header, headerContentStyle]}>
+                    <Pressable
+                        android_disableSound={true}
+                        onPress={toggleSidebar}
+                        style={({ pressed }) => [styles.hamburgerButtonContainer, { opacity: pressed ? 0.5 : 1.0 }]}
                     >
-                        <Text style={[styles.tabText, tabIndex === index && styles.selectedTabText]}>
-                            {tab.title}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+                        <Image
+                            style={[styles.hamburgerButton, { tintColor: colors.text }]}
+                            source={require('../icons/burger-menu.png')}
+                        />
+                    </Pressable>
+                </Animated.View>
+            </Animated.View>
+
+            <Animated.View style={[styles.tabsClip, tabsClipStyle]}>
+                <Animated.View style={[styles.tabsContainer, tabsContentStyle]}>
+                    {routes.map((tab, index) => (
+                        <TouchableOpacity
+                            key={tab.key}
+                            style={[styles.tab, tabIndex === index && styles.selectedTab]}
+                            onPress={() => goToTab(index)}
+                        >
+                            <Text style={[styles.tabText, tabIndex === index && styles.selectedTabText]}>
+                                {tab.title}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </Animated.View>
+            </Animated.View>
 
             <View style={{ flex: 1, overflow: 'hidden' }}>
                 <GestureDetector gesture={pan}>
                     <Animated.View style={[{ flex: 1, flexDirection: 'row', width: windowWidth * routes.length }, pagerStyle]}>
-                        {routes.map((tab) => (
+                        {routes.map((tab, index) => (
                             <View key={tab.key} style={{ width: windowWidth, backgroundColor: colors.background }}>
-                                <TimelineScreen tabType={tab.key} />
+                                <TimelineScreen
+                                    tabType={tab.key}
+                                    isActive={tabIndex === index}
+                                    onTimelineScroll={handleTimelineScroll}
+                                />
                             </View>
                         ))}
                     </Animated.View>
@@ -138,14 +231,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.surface,
     },
     header: {
-        marginTop: 50,
         backgroundColor: colors.surface,
         width: '100%',
         flexDirection: 'row',
         paddingBottom: 10,
-        height: 50,
+        height: HEADER_BAR_HEIGHT,
         justifyContent: 'flex-end', // Pushes hamburger to the right
         alignItems: 'center',
+    },
+    headerClip: {
+        overflow: 'hidden',
+    },
+    statusBarInset: {
+        height: STATUS_BAR_HEIGHT,
     },
     tabsContainer: {
         justifyContent: 'center',
@@ -154,6 +252,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.surface,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: colors.divider,
+        height: TAB_BAR_HEIGHT,
+    },
+    tabsClip: {
+        overflow: 'hidden',
     },
     tab: {
         padding: 10,

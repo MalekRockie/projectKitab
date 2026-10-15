@@ -13,7 +13,7 @@ import PostComponent from '../components/posts/postComp';
 import { shallow } from 'zustand/shallow';
 import { useTheme } from '../theme/useTheme';
 
-export const TimelineScreen = ({ tabType = 'foryou' }) => {
+export const TimelineScreen = ({ tabType = 'foryou', isActive = true, onTimelineScroll }) => {
     const hasInitialFetch = useRef(false);
     const endReachedForScroll = useRef(false);
     const isUserScrolling = useRef(false);
@@ -49,7 +49,8 @@ export const TimelineScreen = ({ tabType = 'foryou' }) => {
         if (isUserScrolling.current && distanceFromEnd > 80) {
             endReachedForScroll.current = false;
         }
-    }, []);
+        onTimelineScroll?.(contentOffset.y, tabType, isActive);
+    }, [isActive, onTimelineScroll, tabType]);
 
     const handleScrollBegin = useCallback(() => {
         isUserScrolling.current = true;
