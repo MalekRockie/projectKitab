@@ -4,10 +4,11 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePStore } from "../services/storage/store/postStore";
 import { useNavigation } from "@react-navigation/native";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { getCommentReplies, getPostComments, togglePostLike } from "../services/api/feed/post/post";
+import { bookmarkTarget, getPostComments, togglePostLike } from "../services/api/feed/post/post";
 import { FlatList } from "react-native-gesture-handler";
 import GalleryViewer from "../components/Media/GalleryViewer";
 import CustomSocialVideoPlayer from "../components/Media/CustomSocialVideoPlayer";
+import CommentItem from "../components/posts/CommentItem";
 import ScreenHeader from "../components/common/ScreenHeader";
 import { useTheme } from '../theme/useTheme';
 
@@ -17,98 +18,6 @@ const OPTIONS = [
 ];
 
 const getBlockType = (block) => block.blockType || block.block_type;
-
-const getTimeAgo = (dateString) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays <= 2) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    });
-};
-
-const CommentItem = React.memo(({ comment, renderBlock, post }) => {
-    const [isPressed, setIsPressed] = useState(false);
-    const pressTimer = useRef(null);
-    const navigation = useNavigation();
-    const colors = useTheme();
-    const styles = useMemo(() => createCommentStyles(colors), [colors]);
-
-    // TODO: not wired to any UI yet — intended for an expandable replies thread.
-    const fetchReplies = async (commentID) => {
-        const response = await getCommentReplies(commentID);
-        console.log(response);
-    };
-
-    const navigateToComment = () => {
-        navigation.navigate('MainApp', { screen: 'CommentScreen', params: { comment, post } });
-    };
-
-    useEffect(() => {
-        return () => clearTimeout(pressTimer.current);
-    }, []);
-
-    return (
-        <Pressable
-            android_disableSound={true}
-            onPressIn={() => {
-                pressTimer.current = setTimeout(() => {
-                    setIsPressed(true);
-                }, 115);
-            }}
-            onPressOut={() => {
-                clearTimeout(pressTimer.current);
-                setIsPressed(false);
-            }}
-            onPress={navigateToComment}
-            style={[styles.container, { backgroundColor: isPressed ? colors.iconBg : colors.surface }]}>
-            <View style={styles.header}>
-                <Image
-                    source={comment.user_avatar ? { uri: comment.user_avatar } : require('../icons/avatar.png')}
-                    style={[styles.avatar, { borderColor: colors.divider }]}
-                />
-                <Text style={styles.username}>{comment.user?.username}</Text>
-                <Text style={styles.timestamp}>
-                    • {getTimeAgo(comment.created_at)}
-                </Text>
-            </View>
-
-            {comment.blocks.map(renderBlock)}
-
-            <View style={styles.actionBar}>
-                <TouchableOpacity
-                    onPress={() => console.log("open comment input screen")}
-                    style={styles.actionButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Reply to comment"
-                >
-                    <Icon name="chat-bubble-outline" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
-                    <Icon name="repeat" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Like comment">
-                    <Icon name="favorite-border" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark comment">
-                    <Icon name="bookmark-border" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share comment">
-                    <Icon name="share" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-            </View>
-        </Pressable>
-    );
-});
 
 // A single grid cell — an image, or a video thumbnail with a play badge.
 // overlayCount, when set, replaces the play badge with a "+N" overlay
@@ -212,6 +121,7 @@ export const PostScreen = ({ route }) => {
     const post = route.params?.post;
     const [refreshing, setRefreshing] = useState(false);
     const [isLiked, setIsLiked] = useState(post?.isLiked);
+    const [isBookmarked, setIsBookmarked] = useState(post?.isBookmarked ?? false);
     const updatePost = usePStore(state => state.updatePost);
     const navigation = useNavigation();
     const colors = useTheme();
@@ -296,6 +206,17 @@ export const PostScreen = ({ route }) => {
         }
     };
 
+    const handleBookmarkPress = async () => {
+        const next = !isBookmarked;
+        setIsBookmarked(next);
+        updatePost(post.id, { isBookmarked: next });
+        const ok = await bookmarkTarget('post', post.id);
+        if (!ok) {
+            setIsBookmarked(!next);
+            updatePost(post.id, { isBookmarked: !next });
+        }
+    };
+
     // Renders the POST's own top-level blocks (both gallery-mode caption
     // text and inline-mode interleaved blocks route through here). Media
     // is wrapped to open the fullscreen GalleryViewer at the correct index
@@ -350,44 +271,9 @@ export const PostScreen = ({ route }) => {
         }
     }, [post, mediaBlocks, styles, openGallery]);
 
-    // Renders blocks WITHIN an individual comment. Deliberately plain — no
-    // gallery-opening Pressable here. Reasons: (1) openGallery(block.id)
-    // searches the post's own mediaBlocks, which never contains a comment's
-    // block id, so it'd silently fall back to opening the post's first
-    // item; (2) wrapping media in its own Pressable would swallow the tap
-    // before it reaches CommentItem's outer Pressable, breaking "tap a
-    // comment to open its thread"; (3) leaving video un-wrapped lets
-    // CustomSocialVideoPlayer's own tap-to-play/fullscreen logic work.
-    const renderCommentBlock = useCallback((block) => {
-        const type = getBlockType(block);
-        switch (type) {
-            case 'text':
-                return (
-                    <View style={styles.content} key={block.id}>
-                        <Text style={styles.textBlock}>{block.content}</Text>
-                    </View>
-                );
-            case 'image':
-                return (
-                    <Image
-                        key={block.id}
-                        source={{ uri: block.content }}
-                        style={styles.inlineMedia}
-                        resizeMode="cover"
-                    />
-                );
-            case 'video':
-                return (
-                    <CustomSocialVideoPlayer key={block.id} block={block} post={post} />
-                );
-            default:
-                return null;
-        }
-    }, [post, styles]);
-
     const renderItem = useCallback(({ item }) => (
-        <CommentItem comment={item} renderBlock={renderCommentBlock} post={post} />
-    ), [renderCommentBlock, post]);
+        <CommentItem comment={item} post={post} />
+    ), [post]);
 
     if (!post) return null;
 
@@ -480,8 +366,17 @@ export const PostScreen = ({ route }) => {
                                     />
                                     <Text style={styles.actionText}>{post.likesCount}</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
-                                    <Icon name="bookmark-border" size={20} color={colors.textSecondary} />
+                                <TouchableOpacity
+                                    style={styles.actionButton}
+                                    onPress={handleBookmarkPress}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark post'}
+                                >
+                                    <Icon
+                                        name={isBookmarked ? "bookmark" : "bookmark-border"}
+                                        size={20}
+                                        color={isBookmarked ? colors.accent : colors.textSecondary}
+                                    />
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
                                     <Icon name="share" size={20} color={colors.textSecondary} />
@@ -866,49 +761,5 @@ const mediaGridStyles = StyleSheet.create({
         color: '#fff',
         fontSize: 22,
         fontWeight: '700',
-    },
-});
-
-const createCommentStyles = (colors) => StyleSheet.create({
-    container: {
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
-        backgroundColor: colors.surface,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 6,
-        gap: 6,
-    },
-    avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 1,
-    },
-    username: {
-        fontWeight: 'bold',
-        fontSize: 14,
-        color: colors.text,
-    },
-    timestamp: {
-        color: colors.textSecondary,
-        fontSize: 12,
-    },
-    body: {
-        fontSize: 14,
-        lineHeight: 20,
-        color: colors.text,
-    },
-    actionBar: {
-        flexDirection: 'row',
-        marginTop: 8,
-        gap: 60,
-    },
-    actionButton: {
-        padding: 4,
     },
 });

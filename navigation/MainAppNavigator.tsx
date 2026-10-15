@@ -5,6 +5,8 @@ import { PostScreen } from "../screens/PostScreen";
 import SettingsScreen from "../screens/SettingsScreen"
 import AccountSettingsScreen from "../screens/AccountSettingsScreen";
 import ThemeSettingsScreen from "../screens/ThemeSettingsScreen";
+import BookmarksScreen from "../screens/BookmarksScreen";
+import BookmarkFolderScreen from "../screens/BookmarkFolderScreen";
 import { View, Dimensions } from "react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Sidebar } from "../components/sidebar/Sidebar";
@@ -53,6 +55,8 @@ function MainAppNavigator() {
                 <Stack.Screen name="Settings" component={SettingsScreen} />
                 <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
                 <Stack.Screen name="Theme" component={ThemeSettingsScreen} />
+                <Stack.Screen name="Bookmarks" component={BookmarksScreen} />
+                <Stack.Screen name="BookmarkFolder" component={BookmarkFolderScreen} />
             </Stack.Navigator>
 
             <Sidebar 

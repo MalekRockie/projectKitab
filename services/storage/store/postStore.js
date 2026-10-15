@@ -21,6 +21,7 @@ const normalizePosts = (postsArray) => {
             createdAt: post.created_at,
             editedAt: post.edited_at,
             isLiked: post.is_liked,
+            isBookmarked: post.is_bookmarked ?? false,
             blockIds: post.postblocks.map(block => block.id),
             layout_mode: post.layout_mode,
         };
@@ -58,7 +59,7 @@ const enrichPost = (postId, entities) => {
         return null;
     }
 
-    const cacheKey = `${postId}-${post.likesCount}-${post.commentCount}-${post.isLiked}-${post.editedAt}`;
+    const cacheKey = `${postId}-${post.likesCount}-${post.commentCount}-${post.isLiked}-${post.isBookmarked}-${post.editedAt}`;
     if (enrichedPostsCache.has(cacheKey)) {
         return enrichedPostsCache.get(cacheKey);
     }
@@ -201,6 +202,21 @@ export const usePStore = create(
             getPost: (postId) => {
                 const {entities} = get();
                 return enrichPost(postId, entities);
+            },
+
+            addPostEntities: (posts, { bookmarked = false } = {}) => {
+                const { entities: normalized, postIds } = normalizePosts(posts);
+                if (bookmarked) {
+                    Object.values(normalized.posts).forEach(post => { post.isBookmarked = true; });
+                }
+                set(state => ({
+                    entities: {
+                        posts: { ...state.entities.posts, ...normalized.posts },
+                        users: { ...state.entities.users, ...normalized.users },
+                        postblocks: { ...state.entities.postblocks, ...normalized.postblocks },
+                    },
+                }));
+                return postIds;
             },
 
             updatePost: (postId, updates) => {

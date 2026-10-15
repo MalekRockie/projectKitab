@@ -18,6 +18,20 @@ export async function togglePostLike(postId, likesCount, updatePost) {
     }
 }
 
+export async function bookmarkTarget(targetType, targetId, folderId) {
+    try {
+        const body = { target_type: targetType, target_id: targetId };
+        if (folderId) {
+            body.folder_id = folderId;
+        }
+        await api.post('/api/p/v1/bookmarks', body);
+        return true;
+    } catch (error) {
+        console.log("bookmark failed", error);
+        return false;
+    }
+}
+
 export async function createComment(postId, comment) {
     try{
         console.log("postId ", postId);

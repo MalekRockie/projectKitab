@@ -7,6 +7,7 @@ export type RemoteUserSettings = {
   reduceMotion: boolean;
   updated_at: string;
   language: string;
+  is_premium?: boolean;
 };
 
 

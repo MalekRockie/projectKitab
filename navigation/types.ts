@@ -13,4 +13,6 @@ export type RootStackParamList = {
     CommentScreen: undefined;
     CommentComposerScreen: undefined;
     Theme: undefined;
+    Bookmarks: undefined;
+    BookmarkFolder: { folderId?: string; name: string };
 };

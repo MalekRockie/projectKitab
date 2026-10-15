@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon, { IoniconsIconName } from '@react-native-vector-icons/ionicons';
 import { useTheme } from '../../theme/useTheme';
 import { ThemeColors } from '../../theme/colors';
 
 interface Props {
-    icon: string;
+    icon: IoniconsIconName;
     iconColor?: string;
     iconBgColor?: string;
     label: string;

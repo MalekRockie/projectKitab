@@ -4,7 +4,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { usePStore } from '../../services/storage/store/postStore';
 import { shallow } from 'zustand/shallow';
-import { togglePostLike } from '../../services/api/feed/post/post';
+import { bookmarkTarget, togglePostLike } from '../../services/api/feed/post/post';
 import { useNavigation } from '@react-navigation/native';
 import GalleryViewer from '../Media/GalleryViewer';
 import { useTheme } from '../../theme/useTheme';
@@ -125,7 +125,7 @@ const MediaGallery = ({ media, style, onPressItem, styles }) => {
     );
 };
 
-const PostComponent = memo(({ postId }) => {
+const PostComponent = memo(({ postId, onRemoveBookmark }) => {
     const colors = useTheme();
     const isDark = colors === darkColors;
 
@@ -141,6 +141,7 @@ const PostComponent = memo(({ postId }) => {
         likeActive: colors.danger,
         likeInactive: colors.textSecondary,
         likePressed: colors.dangerBg,
+        bookmarkActive: colors.accent,
         pillPressed: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
     }), [colors, isDark]);
 
@@ -183,6 +184,22 @@ const PostComponent = memo(({ postId }) => {
     };
 
     const toggleExpand = () => setExpanded(!expanded);
+    const handleBookmarkPress = async (event) => {
+        if (onRemoveBookmark) {
+            event.stopPropagation();
+            const removed = await onRemoveBookmark(post.id);
+            if (removed) {
+                updatePost(post.id, { isBookmarked: false });
+            }
+            return;
+        }
+        const next = !post.isBookmarked;
+        updatePost(post.id, { isBookmarked: next });
+        const ok = await bookmarkTarget('post', post.id);
+        if (!ok) {
+            updatePost(post.id, { isBookmarked: !next });
+        }
+    };
     const goToPost = () => navigation.navigate('MainApp', { screen: 'PostScreen', params: { post } });
 
     if (!post) return null;
@@ -318,6 +335,29 @@ const PostComponent = memo(({ postId }) => {
                             <Text style={[styles.actionText, isLiked && { color: postColors.likeActive }]}>
                                 {formatCount(post.likesCount)}
                             </Text>
+                        </Pressable>
+
+                        <Pressable
+                            android_disableSound={true}
+                            style={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
+                            onPress={handleBookmarkPress}
+                            accessibilityRole="button"
+                            accessibilityLabel={post.isBookmarked ? 'Remove bookmark' : 'Bookmark post'}
+                        >
+                            <Icon
+                                name={post.isBookmarked ? 'bookmark' : 'bookmark-border'}
+                                size={18}
+                                color={post.isBookmarked ? postColors.bookmarkActive : postColors.textSecondary}
+                            />
+                        </Pressable>
+
+                        <Pressable
+                            android_disableSound={true}
+                            style={({ pressed }) => [styles.actionButton, styles.shareActionButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Share post"
+                        >
+                            <Icon name="share" size={18} color={postColors.textSecondary} />
                         </Pressable>
                     </View>
                 </View>
@@ -485,8 +525,7 @@ const createStyles = (c) => StyleSheet.create({
     actionBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        maxWidth: 260,
+        width: '100%',
         marginTop: 8,
     },
     actionButton: {
@@ -496,6 +535,9 @@ const createStyles = (c) => StyleSheet.create({
         paddingVertical: 6,
         paddingHorizontal: 10,
         borderRadius: 999,
+    },
+    shareActionButton: {
+        marginLeft: 'auto',
     },
     actionText: {
         fontSize: 13,
