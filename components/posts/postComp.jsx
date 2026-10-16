@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import GalleryViewer from '../Media/GalleryViewer';
 import { useTheme } from '../../theme/useTheme';
 import { darkColors } from '../../theme/colors';
+import { openUserProfile } from '../../utils/profileNavigation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -184,6 +185,10 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
     };
 
     const toggleExpand = () => setExpanded(!expanded);
+    const handleOpenProfile = (event) => {
+        event.stopPropagation();
+        openUserProfile(navigation, post.user?.id ?? post.user?.user_id ?? post.user_id);
+    };
     const handleBookmarkPress = async (event) => {
         if (onRemoveBookmark) {
             event.stopPropagation();
@@ -249,14 +254,18 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                 style={[styles.container, { backgroundColor: isPressed ? postColors.backgroundPressed : postColors.background }]}
                 onPress={goToPost}
             >
-                <Image
-                    source={post.user_avatar ? { uri: post.user_avatar } : require('../../icons/avatar.png')}
-                    style={styles.avatar}
-                />
+                <Pressable onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="Open profile">
+                    <Image
+                        source={post.user_avatar ? { uri: post.user_avatar } : require('../../icons/avatar.png')}
+                        style={styles.avatar}
+                    />
+                </Pressable>
 
                 <View style={styles.body}>
                     <View style={styles.postHeader}>
-                        <Text style={styles.username}>{post.user?.username}</Text>
+                        <Pressable onPress={handleOpenProfile} accessibilityRole="button">
+                            <Text style={styles.username}>{post.user?.username}</Text>
+                        </Pressable>
                         <Text style={styles.timestamp}> · {formatRelativeTime(post.createdAt)}</Text>
                     </View>
 

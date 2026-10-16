@@ -7,6 +7,8 @@ import { usePStore } from '../../services/storage/store/postStore';
 import PostComponent from '../posts/postComp';
 import { useTheme } from '../../theme/useTheme';
 import { ThemeColors } from '../../theme/colors';
+import { useNavigation } from '@react-navigation/native';
+import { openUserProfile } from '../../utils/profileNavigation';
 
 type PageKey = 'posts' | 'media' | 'comments';
 type ProfileMode = 'posts' | 'media' | 'images' | 'videos' | 'comments' | 'replies';
@@ -19,7 +21,8 @@ type IncludedComment = {
     body?: string;
     comment?: string;
     username?: string;
-    user?: { username?: string };
+    user?: { id?: string | number; user_id?: string | number; username?: string };
+    user_id?: string | number;
     created_at?: string;
     blocks?: Array<{ content?: string }>;
     replies?: IncludedComment[];
@@ -79,11 +82,18 @@ function getCommentText(comment: IncludedComment) {
     return comment.blocks?.map(block => block.content).filter(Boolean).join(' ') || '';
 }
 
+function getEmptyMessage(mode: ProfileMode) {
+    if (mode === 'posts') return 'You haven’t shared any posts yet.';
+    if (mode === 'media' || mode === 'images' || mode === 'videos') return 'No media to show yet.';
+    return 'No comments to show yet.';
+}
+
 function CommentActivity({ comments, includeReplies, styles }: {
     comments: IncludedComment[];
     includeReplies: boolean;
     styles: ReturnType<typeof createStyles>;
 }) {
+    const navigation = useNavigation();
     if (comments.length === 0) {
         return <Text style={styles.noComments}>No comments on this post</Text>;
     }
@@ -92,11 +102,11 @@ function CommentActivity({ comments, includeReplies, styles }: {
         <View style={styles.comments}>
             {comments.map((comment, index) => (
                 <View key={comment.id ?? `${comment.created_at ?? 'comment'}-${index}`} style={styles.comment}>
-                    <Text style={styles.commentAuthor}>{comment.user?.username ?? comment.username ?? 'Comment'}</Text>
+                    <Text onPress={() => openUserProfile(navigation, comment.user?.id ?? comment.user?.user_id ?? comment.user_id)} style={styles.commentAuthor}>{comment.user?.username ?? comment.username ?? 'Comment'}</Text>
                     <Text style={styles.commentText}>{getCommentText(comment)}</Text>
                     {includeReplies && comment.replies?.map((reply, replyIndex) => (
                         <View key={reply.id ?? `${reply.created_at ?? 'reply'}-${replyIndex}`} style={styles.reply}>
-                            <Text style={styles.commentAuthor}>{reply.user?.username ?? reply.username ?? 'Reply'}</Text>
+                            <Text onPress={() => openUserProfile(navigation, reply.user?.id ?? reply.user?.user_id ?? reply.user_id)} style={styles.commentAuthor}>{reply.user?.username ?? reply.username ?? 'Reply'}</Text>
                             <Text style={styles.commentText}>{getCommentText(reply)}</Text>
                         </View>
                     ))}
@@ -106,14 +116,16 @@ function CommentActivity({ comments, includeReplies, styles }: {
     );
 }
 
-function ProfileFeedPage({ mode, active, colors, styles }: {
+function ProfileFeedPage({ mode, active, available, colors, styles }: {
     mode: ProfileMode;
     active: boolean;
+    available: boolean;
     colors: ThemeColors;
     styles: ReturnType<typeof createStyles>;
 }) {
     const feedKey = FEED_KEYS[mode];
     const postIds = usePStore(state => state.feeds[feedKey] || EMPTY_FEED_IDS);
+    const visiblePostIds = available ? postIds : EMPTY_FEED_IDS;
     const pagination = usePStore(state => state.pagination[feedKey] || EMPTY_PAGINATION);
     const addPosts = usePStore(state => state.addPosts);
     const clearFeed = usePStore(state => state.clearFeed);
@@ -128,6 +140,7 @@ function ProfileFeedPage({ mode, active, colors, styles }: {
     const isUserScrolling = useRef(false);
 
     const fetchPage = useCallback(async (reset = false) => {
+        if (!available) return;
         if (inFlightModes.current.has(feedKey)) return;
         const latestPagination = usePStore.getState().pagination[feedKey];
         if (!reset && !latestPagination?.hasNext) return;
@@ -158,8 +171,9 @@ function ProfileFeedPage({ mode, active, colors, styles }: {
             }));
         } catch (fetchError) {
             loadedFeeds.current.delete(feedKey);
+            console.warn('Could not load profile feed', fetchError);
             if (activeFeedRef.current === feedKey) {
-                setError(fetchError instanceof Error ? fetchError.message : 'Could not load posts.');
+                setError('We couldn’t load this content right now. Check your connection and try again.');
             }
         } finally {
             inFlightModes.current.delete(feedKey);
@@ -167,15 +181,15 @@ function ProfileFeedPage({ mode, active, colors, styles }: {
                 setLoading(inFlightModes.current.size > 0);
             }
         }
-    }, [addPosts, clearFeed, feedKey, mode]);
+    }, [addPosts, available, clearFeed, feedKey, mode]);
 
     useEffect(() => {
-        if (!active || loadedFeeds.current.has(feedKey)) return;
+        if (!active || !available || loadedFeeds.current.has(feedKey)) return;
 
         loadedFeeds.current.add(feedKey);
         endReachedForScroll.current = false;
         fetchPage(true);
-    }, [active, feedKey, fetchPage]);
+    }, [active, available, feedKey, fetchPage]);
 
     const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -203,6 +217,7 @@ function ProfileFeedPage({ mode, active, colors, styles }: {
     }, [feedKey, includedPostsByFeed, mode, styles]);
 
     const renderEmpty = useCallback(() => {
+        if (!available) return <Text style={[styles.emptyState, styles.stateText]}>{getEmptyMessage(mode)}</Text>;
         if (loading) return <ActivityIndicator style={styles.emptyState} color={colors.accent} />;
         if (error) {
             return (
@@ -214,13 +229,16 @@ function ProfileFeedPage({ mode, active, colors, styles }: {
                 </View>
             );
         }
-        return <Text style={[styles.emptyState, styles.stateText]}>No posts to show</Text>;
-    }, [colors.accent, error, fetchPage, loading, styles]);
+        const emptyMessage = pagination.totalPosts === 0
+            ? getEmptyMessage(mode)
+            : 'There’s nothing to show here yet.';
+        return <Text style={[styles.emptyState, styles.stateText]}>{emptyMessage}</Text>;
+    }, [available, colors.accent, error, fetchPage, loading, mode, pagination.totalPosts, styles]);
 
     return (
         <FlatList
             style={styles.postsList}
-            data={postIds}
+            data={visiblePostIds}
             renderItem={renderItem}
             keyExtractor={postId => postId.toString()}
             onEndReached={handleEndReached}
@@ -247,7 +265,7 @@ function ProfileFeedPage({ mode, active, colors, styles }: {
                 <ActivityIndicator style={styles.footerLoader} color={colors.accent} />
             ) : error && postIds.length > 0 ? (
                 <Pressable style={styles.footerLoader} onPress={() => fetchPage()} accessibilityRole="button">
-                    <Text style={styles.retryText}>Could not load more. Tap to retry.</Text>
+                    <Text style={styles.retryText}>Couldn’t load more. Tap to try again.</Text>
                 </Pressable>
             ) : null}
         />
@@ -340,6 +358,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         paddingHorizontal: 24,
     },
     stateText: {
+        paddingTop: 30,
         color: colors.textSecondary,
         textAlign: 'center',
         fontSize: 15,
@@ -390,7 +409,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
 });
 
-const ProfilePostsPager: React.FC = () => {
+const ProfilePostsPager: React.FC<{ available?: boolean }> = ({ available = true }) => {
     const { width } = useWindowDimensions();
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
@@ -501,6 +520,7 @@ const ProfilePostsPager: React.FC = () => {
                                 <ProfileFeedPage
                                     mode={mode}
                                     active={activeIndex === index}
+                                    available={available}
                                     colors={colors}
                                     styles={styles}
                                 />

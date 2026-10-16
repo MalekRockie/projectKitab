@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { FlatList, RefreshControl } from "react-native-gesture-handler";
 import { getCommentReplies } from "../services/api/feed/post/post";
 import ActionBar from "../components/posts/ActionBar/ActionBar";
+import { openUserProfile } from "../utils/profileNavigation";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -188,7 +189,7 @@ const threadStyles = StyleSheet.create({
     },
 });
 
-const AvatarColumn = ({ source, size = AVATAR_SIZE, lineAbove = false, lineBelow = false }) => (
+const AvatarColumn = ({ source, size = AVATAR_SIZE, lineAbove = false, lineBelow = false, onPress }) => (
     <View style={threadStyles.leftCol}>
         {/* {lineAbove && <View style={[{paddingTop: 10}, threadStyles.lineSegment, threadStyles.lineTop, ]} />} */}
                 {lineAbove && (
@@ -199,15 +200,20 @@ const AvatarColumn = ({ source, size = AVATAR_SIZE, lineAbove = false, lineBelow
                 ]} 
             />
         )}
-        <Image
+        {onPress ? <Pressable onPress={(event) => { event.stopPropagation(); onPress(); }} accessibilityRole="button" accessibilityLabel="Open profile">
+            <Image
+                source={source}
+                style={[threadStyles.avatar, { width: size, height: size, borderRadius: size / 2 }, lineAbove && { marginTop: 0 }]}
+            />
+        </Pressable> : <Image
             source={source}
             style={[threadStyles.avatar, { width: size, height: size, borderRadius: size / 2 }, lineAbove && { marginTop: 0 }]}
-        />
+        />}
         {lineBelow && <View style={[threadStyles.lineSegment, threadStyles.lineBottom]} />}
     </View>
 );
 
-const PostCard = ({ post, onPress }) => {
+const PostCard = ({ post, onPress, onOpenProfile }) => {
     const pressTimer = useRef(null);
     const [isPressed, setIsPressed] = useState(false);
     const [expanded, setExpanded] = useState(false);
@@ -233,11 +239,14 @@ const PostCard = ({ post, onPress }) => {
                     size={40}
                     lineAbove={false}
                     lineBelow={true}
+                    onPress={() => onOpenProfile(post.user?.id ?? post.user?.user_id ?? post.user_id)}
                 />
                 <View style={{ flex: 1 }}>
                     <View style={styles.cardContent}>
                         <Text style={styles.username}>
-                            {post.user?.username}{" "}
+                            <Text onPress={(event) => { event.stopPropagation(); onOpenProfile(post.user?.id ?? post.user?.user_id ?? post.user_id); }}>
+                                {post.user?.username}
+                            </Text>{" "}
                             <Text style={styles.inlineTimestamp}>
                                 • {getTimeAgoForAncestor(post.createdAt)}
                             </Text>
@@ -265,7 +274,7 @@ const PostCard = ({ post, onPress }) => {
 };
 
 
-const AncestorComment = ({ comment, onPress }) => {
+const AncestorComment = ({ comment, onPress, onOpenProfile }) => {
     const [isPressed, setIsPressed] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const pressTimer = useRef(null);
@@ -288,11 +297,12 @@ const AncestorComment = ({ comment, onPress }) => {
                     size={AVATAR_SIZE_SM}
                     lineAbove={true}
                     lineBelow={true}
+                    onPress={() => onOpenProfile(comment.user?.id ?? comment.user?.user_id ?? comment.user_id)}
                 />
 
                 <View style={styles.ancestorContent}>
                     <View style={styles.ancestorHeader}>
-                        <Text style={styles.ancestorUsername}>{comment.user?.username}</Text>
+                        <Text onPress={(event) => { event.stopPropagation(); onOpenProfile(comment.user?.id ?? comment.user?.user_id ?? comment.user_id); }} style={styles.ancestorUsername}>{comment.user?.username}</Text>
                         <Text style={styles.ancestorTimestamp}>• {getTimeAgoForAncestor(comment.created_at)}</Text>
                     </View>
                     <View style={styles.ancestorBody}>
@@ -315,7 +325,7 @@ const AncestorComment = ({ comment, onPress }) => {
 )};
 
 
-const FocusedComment = ({ comment, onLayout }) => {
+const FocusedComment = ({ comment, onLayout, onOpenProfile }) => {
     return (
         <View onLayout={onLayout} style={styles.focusedContainer}>
             <View style={styles.cardRow}>
@@ -324,10 +334,11 @@ const FocusedComment = ({ comment, onLayout }) => {
                     size={AVATAR_SIZE}
                     lineAbove={true}
                     lineBelow={false}
+                    onPress={() => onOpenProfile(comment.user?.id ?? comment.user?.user_id ?? comment.user_id)}
                 />
                 
                 <View style={[styles.focusedMeta, {marginTop: TOP_SPACE_THREAD}]}>
-                    <Text style={styles.focusedUsername}>{comment.user?.username}</Text>
+                    <Text onPress={(event) => { event.stopPropagation(); onOpenProfile(comment.user?.id ?? comment.user?.user_id ?? comment.user_id); }} style={styles.focusedUsername}>{comment.user?.username}</Text>
                     <Text style={styles.focusedTimestamp}>{getTimeAgo(comment.created_at)}</Text>
                 </View>
             </View>
@@ -357,7 +368,7 @@ const FocusedComment = ({ comment, onLayout }) => {
 )};
 
 
-const ReplyItem = ({ reply, onPress }) => {
+const ReplyItem = ({ reply, onPress, onOpenProfile }) => {
     const [isPressed, setIsPressed] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const pressTimer = useRef(null);
@@ -376,11 +387,13 @@ const ReplyItem = ({ reply, onPress }) => {
             style={[replyStyles.container, { backgroundColor: isPressed ? "#e0e0e0" : "#fff" }]}
         >
             <View style={replyStyles.header}>
-                <Image
-                    source={reply.user?.avatar ? { uri: reply.user.avatar } : require("../icons/avatar.png")}
-                    style={replyStyles.avatar}
-                />
-                <Text style={replyStyles.username}>{reply.user?.username}</Text>
+                <Pressable onPress={(event) => { event.stopPropagation(); onOpenProfile(reply.user?.id ?? reply.user?.user_id ?? reply.user_id); }} accessibilityRole="button" accessibilityLabel="Open profile">
+                    <Image
+                        source={reply.user?.avatar ? { uri: reply.user.avatar } : require("../icons/avatar.png")}
+                        style={replyStyles.avatar}
+                    />
+                </Pressable>
+                <Text onPress={(event) => { event.stopPropagation(); onOpenProfile(reply.user?.id ?? reply.user?.user_id ?? reply.user_id); }} style={replyStyles.username}>{reply.user?.username}</Text>
                 <Text style={replyStyles.timestamp}>• {getTimeAgo(reply.created_at)}</Text>
             </View>
             {renderPostBlocks(reply.blocks, expanded, setExpanded)}
@@ -409,6 +422,7 @@ const ReplyItem = ({ reply, onPress }) => {
 export const CommentFocusScreen = ({ route }) => {
     const { comment, post, ancestors: passedAncestors } = route.params;
     const navigation = useNavigation();
+    const handleOpenProfile = (userId) => openUserProfile(navigation, userId);
 
     const [replies, setReplies] = useState([]);
     const [loadingReplies, setLoadingReplies] = useState(true);
@@ -519,7 +533,7 @@ export const CommentFocusScreen = ({ route }) => {
             case 'post':
                 return (
                     <View onLayout={(e) => console.log('post height:', e.nativeEvent.layout.height)}>
-                        <PostCard post={item.data} onPress={handlePostPress} />
+                        <PostCard post={item.data} onPress={handlePostPress} onOpenProfile={handleOpenProfile} />
                     </View>
                 );
             case 'view_more':
@@ -541,6 +555,7 @@ export const CommentFocusScreen = ({ route }) => {
                     <View onLayout={(e) => console.log('ancestor height:', e.nativeEvent.layout.height)}>
                         <AncestorComment
                             comment={item.data}
+                            onOpenProfile={handleOpenProfile}
                             onPress={(a) =>
                                 navigation.push("CommentScreen", {
                                     comment: a,
@@ -555,13 +570,13 @@ export const CommentFocusScreen = ({ route }) => {
             case 'focused':
             return (
                 <View onLayout={(e) => console.log('focused height:', e.nativeEvent.layout.height)}>
-                    <FocusedComment comment={item.data} />
+                    <FocusedComment comment={item.data} onOpenProfile={handleOpenProfile} />
                 </View>
             );
             case 'divider':
                 return <View style={styles.replyDividerLine} />;
             case 'reply':
-                return <ReplyItem reply={item.data} onPress={handleReplyPress} />;
+                return <ReplyItem reply={item.data} onPress={handleReplyPress} onOpenProfile={handleOpenProfile} />;
             default:
                 return null;
         }

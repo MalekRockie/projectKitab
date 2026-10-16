@@ -6,35 +6,36 @@ const api = privateApi;
 /** @typedef {{ page?: number, limit?: number, hasMedia?: boolean, mediaType?: string, includeComments?: boolean, includeReplies?: boolean, commentsLimit?: number, repliesLimit?: number }} MyPostsOptions */
 
 export async function getCurrentUser (updateProfile) {
-        try {
-            const response = await api.get('/api/p/v1/myprofile')
-            const user = response.data.user;
-            console.log(response.data)
-            if(response.data){
-                updateProfile({
-                    userId: user.id,
-                    username: user.username,
-                    bio: user.bio,
-                    createdAt: user.creater_at,
-                    updatedAt: user.updated_at,
-                    profilePic: "",
-                });
-                return response.data.user;
-            }
-        } catch (error){
-            console.log(error);
-            return null;
-        };
+    const user = await getAccount();
+    if (!user) return null;
+
+    updateProfile({
+        userId: user.id,
+        username: user.username,
+        displayName: user.display_name ?? '',
+        bio: user.bio ?? '',
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+        profilePic: '',
+        onboardingCompleted: user.onboarding_completed ?? false,
+    });
+    return user;
     };
+
+export async function getPublicProfile(userId) {
+    try {
+        const response = await api.get(`/api/p/v1/getUserProfile/${encodeURIComponent(userId)}`);
+        return response.data.profile ?? null;
+    } catch (error) {
+        console.log('Could not load public profile', error);
+        return null;
+    }
+}
 
 export async function getAccount () {
     try {
         const response = await api.get('/api/p/v1/account')
-        const user = response.data.user;
-        console.log(user)
-        if(response.data){
-            return response.data.user;
-        }
+        return response.data?.user ?? null;
     } catch (error){
         console.log(error);
         return null;

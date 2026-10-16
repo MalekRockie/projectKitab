@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type UserProfile = {
     userId: string;
     username: string;
+    displayName: string;
     bio: string;
     createdAt: Date;
     updatedAt: Date;
@@ -21,6 +22,7 @@ type CurrentUserStore = UserProfile & {
 const initialState: UserProfile = {
     userId: "",
     username: "",
+    displayName: "",
     bio: "",
     createdAt: new Date(),
     updatedAt: new Date(),

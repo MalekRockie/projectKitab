@@ -1,51 +1,91 @@
-import React, { useEffect, useMemo } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useCUserStore } from '../services/storage/store/cUserStore';
-import { getCurrentUser } from '../services/api/user/currentUser';
+import { getCurrentUser, getPublicProfile } from '../services/api/user/currentUser';
 import ScreenHeader from '../components/common/ScreenHeader';
 import ProfilePostsPager from '../components/profile/ProfilePostsPager';
 import { useTheme } from '../theme/useTheme';
 
-export const ProfileScreen = () => {
+export const ProfileScreen = ({ route }) => {
+    const userId = route?.params?.userId;
     const updateProfile = useCUserStore(state => state.updateProfile);
-    const username = useCUserStore(state => state.username);
-    const profilePic = useCUserStore(state => state.profilePic);
-    const bio = useCUserStore(state => state.bio);
+    const currentUserId = useCUserStore(state => state.userId);
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
+    const [publicProfile, setPublicProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getCurrentUser(updateProfile);
-    }, [updateProfile]);
+        let isCurrent = true;
+        const loadProfile = async () => {
+            setLoading(true);
+            setPublicProfile(null);
+            let profileId = userId ?? currentUserId;
+
+            if (!profileId) {
+                const account = await getCurrentUser(updateProfile);
+                if (!isCurrent) return;
+                profileId = account?.id;
+            }
+
+            const profile = profileId ? await getPublicProfile(profileId) : null;
+            if (isCurrent) {
+                setPublicProfile(profile);
+                setLoading(false);
+            }
+        };
+
+        loadProfile().catch(() => {
+            if (isCurrent) setLoading(false);
+        });
+        return () => { isCurrent = false; };
+    }, [currentUserId, updateProfile, userId]);
+
+    const isSelf = publicProfile?.is_self === true;
+    const shownUsername = publicProfile?.username;
+    const shownDisplayName = publicProfile?.display_name;
+    const shownProfilePic = publicProfile?.profile_pic;
+    const shownBio = publicProfile?.bio;
+    const joinedDate = publicProfile?.created_at
+        ? new Date(publicProfile.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+        : null;
 
     return (
         <View style={styles.container}>
-            <ScreenHeader title={username} subtitle="Profile" />
+            <ScreenHeader title={shownUsername || 'Profile'} subtitle="Profile" />
+            {loading ? <ActivityIndicator style={styles.loading} color={colors.accent} /> : null}
+            {!loading && !publicProfile ? (
+                <Text style={styles.error}>Could not load this profile.</Text>
+            ) : null}
+            {!loading && publicProfile ? <>
             <View style={styles.profileSummary}>
                 <View style={styles.cover}>
-                    {profilePic ? <Image source={{ uri: profilePic }} style={styles.coverImage} /> : null}
+                    {shownProfilePic ? <Image source={{ uri: shownProfilePic }} style={styles.coverImage} /> : null}
                 </View>
                 <View style={styles.identityRow}>
                     <Image
-                        source={profilePic ? { uri: profilePic } : require('../icons/avatarB.png')}
+                        source={shownProfilePic ? { uri: shownProfilePic } : require('../icons/avatarB.png')}
                         style={styles.avatar}
                     />
-                    <Pressable
+                    {isSelf ? <Pressable
                         android_disableSound={true}
                         style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
                         onPress={() => console.log('Edit Profile')}
                     >
                         <Text style={styles.editButtonText}>Edit Profile</Text>
-                    </Pressable>
+                    </Pressable> : null}
                 </View>
-                <Text style={styles.username}>{username}</Text>
-                {bio ? <Text style={styles.bio}>{bio}</Text> : null}
+                {shownDisplayName ? <Text style={styles.displayName}>{shownDisplayName}</Text> : null}
+                <Text style={styles.username}>{shownUsername}</Text>
+                {shownBio ? <Text style={styles.bio}>{shownBio}</Text> : null}
                 <View style={styles.profileDetails}>
-                    <Text style={styles.summaryMeta}>Location not set</Text>
-                    <Text style={styles.summaryMeta}>Joined [date]</Text>
+                    <Text style={styles.summaryMeta}>{publicProfile.followers_count ?? 0} followers</Text>
+                    <Text style={styles.summaryMeta}>{publicProfile.following_count ?? 0} following</Text>
+                    {joinedDate ? <Text style={styles.summaryMeta}>Joined {joinedDate}</Text> : null}
                 </View>
             </View>
-            <ProfilePostsPager />
+            <ProfilePostsPager available={isSelf} />
+            </> : null}
         </View>
     );
 };
@@ -57,6 +97,14 @@ const createStyles = (colors) => StyleSheet.create({
     },
     profileSummary: {
         backgroundColor: colors.background,
+    },
+    loading: {
+        marginTop: 32,
+    },
+    error: {
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 32,
     },
     cover: {
         height: 80,
@@ -109,6 +157,13 @@ const createStyles = (colors) => StyleSheet.create({
         marginHorizontal: 20,
         marginTop: 4,
     },
+    displayName: {
+        color: colors.text,
+        fontSize: 18,
+        fontWeight: '600',
+        marginHorizontal: 20,
+        marginTop: 4,
+    },
     bio: {
         color: colors.textSecondary,
         fontSize: 14,
@@ -117,8 +172,10 @@ const createStyles = (colors) => StyleSheet.create({
     },
     profileDetails: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         alignItems: 'center',
         gap: 14,
+        rowGap: 8,
         paddingHorizontal: 20,
         paddingTop: 10,
         paddingBottom: 14,

@@ -6,6 +6,7 @@ import CustomSocialVideoPlayer from '../Media/CustomSocialVideoPlayer';
 import { getCommentReplies } from '../../services/api/feed/post/post';
 import { useTheme } from '../../theme/useTheme';
 import { darkColors } from '../../theme/colors';
+import { openUserProfile } from '../../utils/profileNavigation';
 
 const getBlockType = (block) => block.blockType || block.block_type;
 
@@ -47,6 +48,11 @@ const CommentItem = React.memo(({ comment, post, onRemoveBookmark }) => {
             return;
         }
         navigation.navigate('MainApp', { screen: 'CommentScreen', params: { comment, post } });
+    };
+
+    const handleOpenProfile = (event) => {
+        event.stopPropagation();
+        openUserProfile(navigation, comment.user?.id ?? comment.user?.user_id ?? comment.user_id);
     };
 
     useEffect(() => {
@@ -95,14 +101,18 @@ const CommentItem = React.memo(({ comment, post, onRemoveBookmark }) => {
             }}
             onPress={navigateToComment}
             style={[styles.container, { backgroundColor: isPressed ? colors.iconBg : colors.surface }]}>
-            <Image
-                source={comment.user_avatar ? { uri: comment.user_avatar } : require('../../icons/avatar.png')}
-                style={styles.avatar}
-            />
+            <Pressable onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="Open profile">
+                <Image
+                    source={comment.user_avatar ? { uri: comment.user_avatar } : require('../../icons/avatar.png')}
+                    style={styles.avatar}
+                />
+            </Pressable>
 
             <View style={styles.body}>
                 <View style={styles.header}>
-                    <Text style={styles.username}>{comment.user?.username}</Text>
+                    <Pressable onPress={handleOpenProfile} accessibilityRole="button">
+                        <Text style={styles.username}>{comment.user?.username}</Text>
+                    </Pressable>
                     <Text style={styles.timestamp}> • {getTimeAgo(comment.created_at)}</Text>
                 </View>
 

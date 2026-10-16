@@ -8,7 +8,7 @@ export type RootStackParamList = {
 
     // MainApp Nested Screens
     Home: undefined; 
-    Profile: undefined;
+    Profile: { userId?: string } | undefined;
     PostScreen: undefined;
     CommentScreen: undefined;
     CommentComposerScreen: undefined;
