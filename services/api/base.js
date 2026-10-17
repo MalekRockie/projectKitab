@@ -1,14 +1,8 @@
 import axios from "axios";
-import { Platform } from "react-native";
+import { API_BASE_URL } from "../../config/env";
 import { useUTStore } from "../storage/store/tstore";
 import { Logout, reAuth } from "./auth/auth";
 import { getRToken } from "../auth/checkAuth";
-
-const API_BASE_URL = Platform.select({
-    android: 'http://10.0.2.2:8080',
-    ios: 'http://localhost:8080',
-    default: 'http://localhost:8080',
-});
 
 export const publicApi = axios.create({
     baseURL: API_BASE_URL,
