@@ -12,6 +12,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { CommentComposer } from "../screens/CommentComposerScreen";
 import { CommentFocusScreen } from "../screens/CommentFocusScreen";
+import MessagesScreen from "../screens/MessagesScreen";
 import { useSharedValue } from "react-native-reanimated";
 import { useSettingsSync } from "../services/sync/useSettingsSync"; 
 
@@ -51,7 +52,14 @@ function MainAppNavigator() {
                     name={"CommentComposerScreen"} 
                     options={{ animation: 'slide_from_bottom' }} 
                     component={CommentComposer}/>
-                {/* <Stack.Screen name="Messages" component={ProfileScreen} /> */}
+                <Stack.Screen name="Messages">
+                    {props => (
+                        <MessagesScreen
+                            {...props}
+                            onOpenSidebar={() => setSidebarVisible(true)}
+                        />
+                    )}
+                </Stack.Screen>
                 <Stack.Screen name="Settings" component={SettingsScreen} />
                 <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
                 <Stack.Screen name="Theme" component={ThemeSettingsScreen} />
