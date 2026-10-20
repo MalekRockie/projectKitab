@@ -1,9 +1,9 @@
 import { Message } from '../services/messages/messageMapping';
 
 export type Room = { id: string; name: string; messages: Message[] };
-export type Server = { id: string; name: string; initials: string; tint: string; rooms: Room[] };
+export type Server = { id: string; name: string; initials: string; tint: string; rooms: Room[]; folderId?: string | null };
 
-// Placeholder data until Circles have a backend.
+// Sample channel data remains local until circle channel endpoints are available.
 export const SERVERS: Server[] = [
     {
         id: 'reading-room', name: 'The Reading Room', initials: 'RR', tint: '#2B776A',

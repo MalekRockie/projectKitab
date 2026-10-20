@@ -19,12 +19,29 @@ import { useTheme } from '../theme/useTheme';
 import { ThemeColors } from '../theme/colors';
 import { useCUserStore } from '../services/storage/store/cUserStore';
 import { Conversation, ConversationMessage, getConversationMessages, getConversations } from '../services/api/messages/conversations';
+import {
+    Circle,
+    CircleFolder,
+    CircleLayoutItem,
+    buildCircleLayout,
+    createCircle,
+    createCircleFolder,
+    deleteCircleFolder,
+    getCircleFolders,
+    getCircles,
+    moveCircleToFolder,
+    renameCircleFolder,
+    updateCircleOrder,
+} from '../services/api/messages/circles';
 import { Message, formatMessageTime, getConversationInitials, mapConversationMessage } from '../services/messages/messageMapping';
 import { useMessagesSocket } from '../services/messages/useMessagesSocket';
 import { INITIAL_CHAT_STATE, SERVERS, Server } from '../data/circles';
 import ChannelRow from '../components/messages/ChannelRow';
 import ChatView from '../components/messages/ChatView';
 import CircleDrawer from '../components/messages/CircleDrawer';
+import CircleManager from '../components/messages/CircleManager';
+import CircleNameDialog from '../components/messages/CircleNameDialog';
+import CircleRail, { CircleDragEntity, CircleDropTarget } from '../components/messages/CircleRail';
 import DirectInbox from '../components/messages/DirectInbox';
 import { useCircleDrawer } from '../components/messages/useCircleDrawer';
 
@@ -37,8 +54,14 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const styles = useMemo(() => createStyles(colors, wide), [colors, wide]);
     const currentUserId = useCUserStore(state => state.userId);
     const [mode, setMode] = useState<'servers' | 'direct'>('servers');
-    const [serverId, setServerId] = useState(SERVERS[0].id);
-    const [roomId, setRoomId] = useState(SERVERS[0].rooms[0].id);
+    const [serverId, setServerId] = useState('');
+    const [roomId, setRoomId] = useState('');
+    const [circles, setCircles] = useState<Circle[]>([]);
+    const [circleFolders, setCircleFolders] = useState<CircleFolder[]>([]);
+    const [circlesLoading, setCirclesLoading] = useState(true);
+    const [circlesError, setCirclesError] = useState<string | null>(null);
+    const [circleManagerOpen, setCircleManagerOpen] = useState(false);
+    const [circleNameDialogOpen, setCircleNameDialogOpen] = useState(false);
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [conversationsLoading, setConversationsLoading] = useState(true);
@@ -55,6 +78,25 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const messageListRef = useRef<FlatList<Message> | null>(null);
     const drawer = useCircleDrawer();
     const appSidebarGestureStartX = useSharedValue(0);
+
+    const refreshCircles = useCallback(async () => {
+        setCirclesLoading(true);
+        setCirclesError(null);
+        try {
+            const [circleList, folderList] = await Promise.all([getCircles(), getCircleFolders()]);
+            setCircles([...circleList].sort((a, b) => a.display_order - b.display_order));
+            setCircleFolders([...folderList].sort((a, b) => a.display_order - b.display_order));
+        } catch (error) {
+            console.warn('Could not load circles and folders', error);
+            setCirclesError('We couldn’t load your circles and folders. Check your connection and try again.');
+        } finally {
+            setCirclesLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        refreshCircles();
+    }, [refreshCircles]);
 
     const refreshConversations = useCallback(async () => {
         setConversationsLoading(true);
@@ -137,10 +179,48 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
         return () => { isCurrent = false; };
     }, [activeConversationId, loadConversationMessages, mode]);
 
-    const server = SERVERS.find(item => item.id === serverId) ?? SERVERS[0];
-    const room = server.rooms.find(item => item.id === roomId) ?? server.rooms[0];
+    const servers = useMemo(() => {
+        const circleById = new Map(circles.map(circle => [circle.id, circle]));
+        const orderedCircles = buildCircleLayout(circles, circleFolders).reduce<Circle[]>((ordered, item) => {
+            const circleIds = item.type === 'circle' ? [item.id] : item.circle_ids;
+            circleIds.forEach(id => {
+                const circle = circleById.get(id);
+                if (circle) {
+                    ordered.push(circle);
+                }
+            });
+            return ordered;
+        }, []);
+        return orderedCircles.map((circle, index) => {
+            const template = SERVERS[index % SERVERS.length];
+            return {
+                ...template,
+                id: circle.id,
+                name: circle.name,
+                initials: circle.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? '').join('') || '?',
+                folderId: circle.folder_id,
+            };
+        });
+    }, [circleFolders, circles]);
+    useEffect(() => {
+        if (!servers.length) {
+            setServerId('');
+            setRoomId('');
+            return;
+        }
+        const selectedServer = servers.find(item => item.id === serverId);
+        if (!selectedServer) {
+            setServerId(servers[0].id);
+            setRoomId(servers[0].rooms[0]?.id ?? '');
+        } else if (!selectedServer.rooms.some(item => item.id === roomId)) {
+            setRoomId(selectedServer.rooms[0]?.id ?? '');
+        }
+    }, [roomId, serverId, servers]);
+
+    const server = servers.find(item => item.id === serverId) ?? servers[0] ?? null;
+    const room = server?.rooms.find(item => item.id === roomId) ?? server?.rooms[0] ?? null;
     const activeConversation = conversations.find(item => item.id === activeConversationId) ?? null;
-    const activeChatId = room.id;
+    const activeChatId = room?.id ?? '';
     const activeMessages = mode === 'servers'
         ? chats[activeChatId] ?? []
         : activeConversationId ? directMessages[activeConversationId] ?? [] : [];
@@ -163,8 +243,148 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
 
     const chooseServer = (nextServer: Server) => {
         setServerId(nextServer.id);
-        setRoomId(nextServer.rooms[0].id);
+        setRoomId(nextServer.rooms[0]?.id ?? '');
     };
+
+    const runCircleMutation = async (mutation: () => Promise<void>) => {
+        await mutation();
+        await refreshCircles();
+    };
+
+    const layoutWithoutCircles = (circleIds: string[]) => buildCircleLayout(circles, circleFolders).reduce<CircleLayoutItem[]>((result, item) => {
+        if (item.type === 'circle') {
+            if (!circleIds.includes(item.id)) {
+                result.push(item);
+            }
+            return result;
+        }
+        result.push({ ...item, circle_ids: item.circle_ids.filter(id => !circleIds.includes(id)) });
+        return result;
+    }, []);
+
+    const createFolderFromDrop = async (sourceCircleId: string, targetCircleId: string) => {
+        const sourceCircle = circles.find(circle => circle.id === sourceCircleId);
+        const targetCircle = circles.find(circle => circle.id === targetCircleId);
+        if (!sourceCircle || !targetCircle) {
+            return;
+        }
+
+        const folderName = `${targetCircle.name} + ${sourceCircle.name}`;
+        try {
+            const folder = await createCircleFolder(folderName);
+            await Promise.all([
+                moveCircleToFolder(sourceCircleId, folder.id),
+                moveCircleToFolder(targetCircleId, folder.id),
+            ]);
+
+            const nextLayout = layoutWithoutCircles([sourceCircleId, targetCircleId]);
+            const existingLayout = buildCircleLayout(circles, circleFolders);
+            const originalIndex = existingLayout.findIndex(item =>
+                item.type === 'circle'
+                    ? item.id === sourceCircleId || item.id === targetCircleId
+                    : item.circle_ids.includes(sourceCircleId) || item.circle_ids.includes(targetCircleId),
+            );
+            nextLayout.splice(originalIndex < 0 ? nextLayout.length : Math.min(originalIndex, nextLayout.length), 0, {
+                type: 'folder',
+                id: folder.id,
+                circle_ids: [targetCircleId, sourceCircleId],
+            });
+            await updateCircleOrder(nextLayout);
+            await refreshCircles();
+        } catch (error) {
+            console.warn('Could not create a folder from dropped circles', error);
+            await refreshCircles();
+            setCirclesError('That folder could not be created. Check your connection and try again.');
+        }
+    };
+
+    const handleCircleDrop = async (circleId: string, target: CircleDropTarget) => {
+        if (target.type === 'circle') {
+            if (target.id === circleId) {
+                return;
+            }
+            await createFolderFromDrop(circleId, target.id);
+            return;
+        }
+
+        const sourceCircle = circles.find(circle => circle.id === circleId);
+        if (!sourceCircle) {
+            return;
+        }
+        const targetFolderId = target.type === 'folder' ? target.id : null;
+        if (sourceCircle.folder_id === targetFolderId) {
+            return;
+        }
+
+        const nextLayout = layoutWithoutCircles([circleId]);
+        if (targetFolderId) {
+            const folderEntry = nextLayout.find(item => item.type === 'folder' && item.id === targetFolderId);
+            if (folderEntry?.type === 'folder') {
+                folderEntry.circle_ids.push(circleId);
+            } else {
+                nextLayout.push({ type: 'circle', id: circleId });
+            }
+        } else {
+            nextLayout.unshift({ type: 'circle', id: circleId });
+        }
+
+        try {
+            await moveCircleToFolder(circleId, targetFolderId);
+            await updateCircleOrder(nextLayout);
+            await refreshCircles();
+        } catch (error) {
+            console.warn('Could not move circle', error);
+            setCirclesError('That circle could not be moved. Check your connection and try again.');
+        }
+    };
+
+    const reorderCircleEntry = async (entity: CircleDragEntity, targetIndex: number) => {
+        const currentLayout = buildCircleLayout(circles, circleFolders);
+        let draggedEntry: CircleLayoutItem;
+        if (entity.type === 'circle') {
+            draggedEntry = { type: 'circle', id: entity.id };
+        } else {
+            const draggedFolder = currentLayout.find(item => item.type === 'folder' && item.id === entity.id);
+            if (!draggedFolder || draggedFolder.type !== 'folder') {
+                return;
+            }
+            draggedEntry = draggedFolder;
+        }
+
+        const nextLayout = currentLayout.reduce<CircleLayoutItem[]>((result, item) => {
+            if (entity.type === 'folder' && item.type === 'folder' && item.id === entity.id) {
+                return result;
+            }
+            if (entity.type === 'circle' && item.type === 'circle' && item.id === entity.id) {
+                return result;
+            }
+            if (entity.type === 'circle' && item.type === 'folder') {
+                result.push({ ...item, circle_ids: item.circle_ids.filter(id => id !== entity.id) });
+                return result;
+            }
+            result.push(item);
+            return result;
+        }, []);
+
+        const movedCircle = entity.type === 'circle'
+            ? circles.find(circle => circle.id === entity.id)
+            : null;
+        nextLayout.splice(Math.max(0, Math.min(targetIndex, nextLayout.length)), 0,
+            draggedEntry,
+        );
+
+        try {
+            if (movedCircle?.folder_id) {
+                await moveCircleToFolder(entity.id, null);
+            }
+            await updateCircleOrder(nextLayout);
+            await refreshCircles();
+        } catch (error) {
+            console.warn('Could not reorder circles or folders', error);
+            setCirclesError('That order could not be saved. Check your connection and try again.');
+        }
+    };
+
     const openDirectChat = (nextConversation: Conversation) => {
         setModeChangeDirection(null);
         setActiveConversationId(nextConversation.id);
@@ -244,15 +464,15 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 listRef={messageListRef}
                 listKey={direct ? `direct-${activeConversationId ?? 'none'}` : `circle-${activeChatId}`}
                 messages={activeMessages}
-                title={direct ? (activeConversation ? directName : 'Select a conversation') : room.name}
-                subtitle={direct ? activeConversation?.participant.username ?? '' : `${server.name} · ${room.name}`}
-                leading={direct ? (activeConversation ? { initials: getConversationInitials(activeConversation) } : undefined) : 'hash'}
+                title={direct ? (activeConversation ? directName : 'Select a conversation') : room?.name ?? 'Choose a circle'}
+                subtitle={direct ? activeConversation?.participant.username ?? '' : server && room ? `${server.name} · ${room.name}` : ''}
+                leading={direct ? (activeConversation ? { initials: getConversationInitials(activeConversation) } : undefined) : room ? 'hash' : undefined}
                 loading={direct && messagesLoading}
                 error={direct ? messagesError : null}
                 onRetry={() => { if (activeConversationId) loadConversationMessages(activeConversationId); }}
-                emptyTitle={!direct ? 'A fresh start' : activeConversationId ? 'No messages yet' : 'Choose a conversation'}
+                emptyTitle={!direct ? (server ? 'A fresh start' : 'No circles yet') : activeConversationId ? 'No messages yet' : 'Choose a conversation'}
                 emptyCopy={!direct
-                    ? 'Say hello and get the conversation going.'
+                    ? server ? 'Say hello and get the conversation going.' : 'Create a circle to get started.'
                     : activeConversationId
                         ? 'Messages in this conversation will appear here.'
                         : 'Select someone from your direct message history to open the chat.'}
@@ -260,8 +480,8 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     value: draft,
                     onChangeText: setDraft,
                     onSend: sendMessage,
-                    placeholder: !direct ? `Message #${room.name}` : activeConversation ? `Message ${directName}` : 'Choose a conversation',
-                    disabled: direct && !activeConversationId,
+                    placeholder: !direct ? room ? `Message #${room.name}` : 'Create a circle to start chatting' : activeConversation ? `Message ${directName}` : 'Choose a conversation',
+                    disabled: direct ? !activeConversationId : !room,
                     connection: direct ? { status: socketStatus, onReconnect: reconnectSocket } : undefined,
                 }}
                 {...handlers}
@@ -283,26 +503,41 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     );
 
     const serverRail = (
-        <ScrollView style={styles.serverRail} contentContainerStyle={styles.serverRailContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.railLabel}>CIRCLES</Text>
-            {SERVERS.map(item => (
-                <Pressable key={item.id} onPress={() => chooseServer(item)} accessibilityRole="button" accessibilityLabel={item.name} style={[styles.serverButton, serverId === item.id && styles.serverButtonActive]}>
-                    <View style={[styles.serverMark, { backgroundColor: item.tint }, serverId === item.id && styles.serverMarkActive]}>
-                        <Text style={styles.serverInitials}>{item.initials}</Text>
-                    </View>
-                    {serverId === item.id ? <View style={styles.serverIndicator} /> : null}
-                </Pressable>
-            ))}
-        </ScrollView>
+        <CircleRail
+            circles={circles}
+            folders={circleFolders}
+            selectedCircleId={server?.id ?? null}
+            loading={circlesLoading}
+            error={circlesError}
+            onChooseCircle={circleId => {
+                const selectedServer = servers.find(item => item.id === circleId);
+                if (selectedServer) {
+                    chooseServer(selectedServer);
+                }
+            }}
+            onCreateCircle={() => setCircleNameDialogOpen(true)}
+            onManageFolders={() => setCircleManagerOpen(true)}
+            onRetry={refreshCircles}
+            onDropCircle={handleCircleDrop}
+            onReorder={reorderCircleEntry}
+        />
     );
     const conversationList = (
         <View style={styles.conversationList}>
             {mode === 'servers' ? <>
                 <View style={styles.listHeadingRow}><Text style={styles.listHeading}>CIRCLE CHANNELS</Text></View>
-                <Text style={styles.serverName}>{server.name}</Text>
-                {server.rooms.map(item => (
-                    <ChannelRow key={item.id} name={item.name} active={room.id === item.id} unread={item.id === 'general' && server.id === SERVERS[0].id} onPress={() => setRoomId(item.id)} />
+                {circlesLoading ? <Text style={styles.listStatus}>Loading circles…</Text> : null}
+                {circlesError ? (
+                    <Pressable onPress={() => { refreshCircles(); }} style={styles.retryRow}>
+                        <Text style={styles.listError}>{circlesError}</Text>
+                        <Text style={styles.retryText}>Try again</Text>
+                    </Pressable>
+                ) : null}
+                {server ? <Text style={styles.serverName}>{server.name}</Text> : null}
+                {server?.rooms.map(item => (
+                    <ChannelRow key={item.id} name={item.name} active={room?.id === item.id} unread={item.id === 'general' && server.id === servers[0]?.id} onPress={() => setRoomId(item.id)} />
                 ))}
+                {!circlesLoading && !circlesError && !server ? <Text style={styles.listStatus}>No circles yet. Use the + button to create one.</Text> : null}
             </> : <>
                 <View style={styles.listHeadingRow}><Text style={styles.listHeading}>DIRECT MESSAGES</Text></View>
                 {renderInbox(false)}
@@ -383,9 +618,18 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                             {mode === 'servers' ? (
                                 <CircleDrawer
                                     drawer={drawer}
-                                    servers={SERVERS}
+                                    circles={circles}
+                                    servers={servers}
                                     server={server}
-                                    roomId={room.id}
+                                    roomId={room?.id ?? ''}
+                                    folders={circleFolders}
+                                    loading={circlesLoading}
+                                    error={circlesError}
+                                    onRetry={() => { refreshCircles(); }}
+                                    onCreateCircle={() => setCircleNameDialogOpen(true)}
+                                    onManageFolders={() => setCircleManagerOpen(true)}
+                                    onDropCircle={handleCircleDrop}
+                                    onReorder={reorderCircleEntry}
                                     onChooseServer={chooseServer}
                                     onChooseRoom={nextRoomId => { setRoomId(nextRoomId); drawer.closeDrawer(); }}
                                     onOpenDirect={() => { showDirect(); drawer.closeDrawer(); }}
@@ -395,6 +639,22 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     </View>
                 )}
             </KeyboardAvoidingView>
+            <CircleManager
+                visible={circleManagerOpen}
+                folders={circleFolders}
+                onClose={() => setCircleManagerOpen(false)}
+                onRenameFolder={(folderId, name) => runCircleMutation(() => renameCircleFolder(folderId, name))}
+                onDeleteFolder={folderId => runCircleMutation(() => deleteCircleFolder(folderId))}
+            />
+            <CircleNameDialog
+                visible={circleNameDialogOpen}
+                kind="circle"
+                onClose={() => setCircleNameDialogOpen(false)}
+                onSubmit={async name => {
+                    await createCircle(name);
+                    await refreshCircles();
+                }}
+            />
         </SafeAreaView>
     );
 }
@@ -419,7 +679,10 @@ const createStyles = (colors: ThemeColors, wide: boolean) => StyleSheet.create({
     workspace: { flex: 1, flexDirection: 'row' },
     serverRail: { width: wide ? 68 : 64, flexGrow: 0, flexShrink: 0, backgroundColor: colors.iconBg, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.divider },
     serverRailContent: { alignItems: 'center', paddingTop: 12, paddingBottom: 16, gap: 8 },
+    railHeading: { alignItems: 'center', gap: 5 },
     railLabel: { color: colors.textSecondary, fontSize: 9, fontWeight: '800', marginBottom: 4 },
+    railStatus: { color: colors.textSecondary, fontSize: 9 },
+    railFolderLabel: { maxWidth: 58, color: colors.textSecondary, fontSize: 8, fontWeight: '700' },
     serverButton: { width: 54, height: 54, justifyContent: 'center', alignItems: 'center', position: 'relative' },
     serverButtonActive: { width: 62 },
     serverMark: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
@@ -430,6 +693,10 @@ const createStyles = (colors: ThemeColors, wide: boolean) => StyleSheet.create({
     listHeadingRow: { height: 30, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5 },
     listHeading: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
     serverName: { color: colors.text, fontSize: 16, fontWeight: '700', paddingHorizontal: 6, paddingTop: 12, paddingBottom: 14 },
+    listStatus: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, paddingHorizontal: 6, paddingVertical: 12 },
+    retryRow: { paddingHorizontal: 6, paddingVertical: 8, gap: 7 },
+    listError: { color: colors.danger, fontSize: 12, lineHeight: 17 },
+    retryText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
     chatPane: { flex: 1, minWidth: 0, backgroundColor: colors.background },
     mobileWorkspace: { flex: 1, flexDirection: 'row', position: 'relative' },
     mobileDirectPage: { flex: 1, backgroundColor: colors.background },
