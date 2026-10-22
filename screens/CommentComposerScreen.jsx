@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
     Text,
     View,
@@ -11,7 +11,15 @@ import {
     Keyboard,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createComment } from "../services/api/feed/post/post";
+import { useTheme } from "../theme/useTheme";
+
+const useComposerStyles = () => {
+    const colors = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
+    return { colors, styles };
+};
 
 const formatRelativeTime = (dateString) => {
     const now = new Date();
@@ -24,6 +32,7 @@ const formatRelativeTime = (dateString) => {
 };
 
 const AvatarPlaceholder = ({ username, size = 32 }) => {
+    const { styles } = useComposerStyles();
     const initials = username ? username.slice(0, 2).toUpperCase() : "??";
     const palette = ["#6C63FF", "#FF6584", "#43B89C", "#F4A261", "#E76F51"];
     const bg = palette[username?.charCodeAt(0) % palette.length] ?? palette[0];
@@ -37,6 +46,7 @@ const AvatarPlaceholder = ({ username, size = 32 }) => {
 const PREVIEW_CHAR_LIMIT = 120;
 
 const PostContentPreview = ({ postblocks = [] }) => {
+    const { styles } = useComposerStyles();
     const merged = postblocks
         .slice()
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
@@ -59,10 +69,13 @@ const PostContentPreview = ({ postblocks = [] }) => {
 
 export const CommentComposer = ({ route, navigation }) => {
     const post = route?.params?.post ?? SAMPLE_POST;
+    const { colors, styles } = useComposerStyles();
     const [comment, setComment] = useState("");
     const inputRef = useRef(null);
 
     const suppressDismiss = useRef(false);
+    const insets = useSafeAreaInsets();
+    const keyboardShown = useRef(false);
 
     const user = post.user ?? {};
     const timeAgo = formatRelativeTime(post.createdAt);
@@ -79,15 +92,30 @@ export const CommentComposer = ({ route, navigation }) => {
         }, [])
     );
 
+    // Closing the keyboard dismisses the composer, but only after the keyboard
+    // has actually been shown for this screen. Stray hide events during the
+    // open transition (focus changes, simulator keyboards) must not close it.
     useEffect(() => {
-        const sub = Keyboard.addListener("keyboardDidHide", () => {
+        const showSub = Keyboard.addListener("keyboardDidShow", () => {
+            keyboardShown.current = true;
+        });
+        const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+            if (!keyboardShown.current) {
+                return;
+            }
+            keyboardShown.current = false;
             if (suppressDismiss.current) {
                 suppressDismiss.current = false;
                 return;
             }
-            navigation?.goBack();
+            if (navigation?.isFocused()) {
+                navigation.goBack();
+            }
         });
-        return () => sub.remove();
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
     }, [navigation]);
 
     const dismiss = (cb) => {
@@ -117,7 +145,7 @@ export const CommentComposer = ({ route, navigation }) => {
     };
 
     return (
-        <View style={styles.root}>
+        <View style={[styles.root, { paddingTop: insets.top }]}>
 
             <View style={styles.header}>
                 <TouchableOpacity
@@ -186,7 +214,7 @@ export const CommentComposer = ({ route, navigation }) => {
                         ref={inputRef}
                         style={styles.textInput}
                         placeholder="Write your reply…"
-                        placeholderTextColor="#9CA3AF"
+                        placeholderTextColor={colors.textSecondary}
                         multiline
                         value={comment}
                         onChangeText={setComment}
@@ -222,20 +250,22 @@ export const CommentComposer = ({ route, navigation }) => {
     );
 };
 
-const C = {
-    bg: "#FFFFFF",
-    border: "#E5E7EB",
-    text: "#111827",
-    muted: "#6B7280",
-    subtle: "#9CA3AF",
-    accent: "#2563EB",
-    quoteBorder: "#D1D5DB",
-    quoteBg: "#F9FAFB",
-    warn: "#F59E0B",
-    error: "#EF4444",
-};
+const WARN_COLOR = "#F59E0B";
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => {
+    const C = {
+        bg: colors.background,
+        border: colors.divider,
+        text: colors.text,
+        muted: colors.textSecondary,
+        subtle: colors.textSecondary,
+        accent: colors.accent,
+        quoteBorder: colors.divider,
+        warn: WARN_COLOR,
+        error: colors.danger,
+    };
+
+    return StyleSheet.create({
     root: {
         flex: 1,
         backgroundColor: C.bg,
@@ -421,4 +451,5 @@ const styles = StyleSheet.create({
         color: C.error,
         fontWeight: "700",
     },
-});
+    });
+};
