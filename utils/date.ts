@@ -12,6 +12,22 @@ export const getformatDateUS = (
 };
 
 
+// e.g. "3:45 PM • 22 Oct 26"
+export const formatPostTimestamp = (value: string | number | Date): string => {
+    const date = new Date(value);
+    const time = date.toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+    const day = date.toLocaleString('en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: '2-digit',
+    });
+    return `${time} • ${day}`;
+};
+
 export const getformatDateWithH = (
     date: Date | null | undefined
 ): string => {

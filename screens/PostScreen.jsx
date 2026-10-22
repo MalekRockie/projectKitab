@@ -1,290 +1,65 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Pressable, RefreshControl, Modal } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { usePStore } from "../services/storage/store/postStore";
-import { useNavigation } from "@react-navigation/native";
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { bookmarkTarget, getPostComments, togglePostLike } from "../services/api/feed/post/post";
-import { FlatList } from "react-native-gesture-handler";
-import GalleryViewer from "../components/Media/GalleryViewer";
-import CustomSocialVideoPlayer from "../components/Media/CustomSocialVideoPlayer";
-import CommentItem from "../components/posts/CommentItem";
-import ScreenHeader from "../components/common/ScreenHeader";
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Image, RefreshControl, Modal } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { GestureHandlerRootView, FlatList } from 'react-native-gesture-handler';
+import { usePStore } from '../services/storage/store/postStore';
+import GalleryViewer from '../components/Media/GalleryViewer';
+import MediaGrid from '../components/Media/MediaGrid';
+import CommentItem from '../components/posts/CommentItem';
+import PostBlock from '../components/posts/PostBlock';
+import PostDetailActions from '../components/posts/PostDetailActions';
+import ScreenHeader from '../components/common/ScreenHeader';
+import SortDropdown from '../components/common/SortDropdown';
+import useGalleryViewer from '../hooks/useGalleryViewer';
+import usePostActions from '../hooks/usePostActions';
+import usePostComments, { COMMENT_SORT_OPTIONS } from '../hooks/usePostComments';
 import { useTheme } from '../theme/useTheme';
-
-const OPTIONS = [
-    { name: 'Most Recent', value: 'recent' },
-    { name: 'Top Comments', value: 'top' },
-];
-
-const getBlockType = (block) => block.blockType || block.block_type;
-
-// A single grid cell — an image, or a video thumbnail with a play badge.
-// overlayCount, when set, replaces the play badge with a "+N" overlay
-// (used on the last visible cell when there are more than 4 media items).
-const MediaCell = ({ block, style, overlayCount, onPress }) => {
-    const isVideo = getBlockType(block) === 'video';
-    const showPlayBadge = isVideo && overlayCount == null;
-
-    return (
-        <Pressable
-            onPress={onPress}
-            style={[mediaGridStyles.cell, style]}
-            accessibilityRole="button"
-            accessibilityLabel={isVideo ? 'Play video' : 'View image'}
-        >
-            {isVideo && !block.thumbnailUrl ? (
-                <View style={mediaGridStyles.videoPlaceholder} />
-            ) : (
-                <Image
-                    source={{ uri: isVideo ? block.thumbnailUrl : block.content }}
-                    style={mediaGridStyles.cellImage}
-                    resizeMode="cover"
-                />
-            )}
-            {showPlayBadge && (
-                <View style={mediaGridStyles.playBadge}>
-                    <Icon name="play-arrow" size={22} color="#fff" />
-                </View>
-            )}
-            {overlayCount != null && (
-                <View style={mediaGridStyles.moreOverlay}>
-                    <Text style={mediaGridStyles.moreOverlayText}>+{overlayCount}</Text>
-                </View>
-            )}
-        </Pressable>
-    );
-};
-
-// Same arrangement rules as the feed card's MediaGallery (1 full width, 2
-// side by side, 3 one-big-two-stacked, 4+ as a 2x2 with a "+N" overlay),
-// ported here and extended so video blocks are valid grid cells too. Every
-// cell is individually tappable and opens the fullscreen GalleryViewer at
-// its correct index. Only used in gallery layout mode.
-const MediaGrid = ({ media, onPressItem }) => {
-    const count = media.length;
-    if (count === 0) return null;
-
-    const renderCell = (block, style, overlayCount = null) => (
-        <MediaCell
-            key={block.id}
-            block={block}
-            style={style}
-            overlayCount={overlayCount}
-            onPress={() => onPressItem(block.id)}
-        />
-    );
-
-    if (count === 1) {
-        return (
-            <View style={mediaGridStyles.container}>
-                {renderCell(media[0], mediaGridStyles.single)}
-            </View>
-        );
-    }
-
-    if (count === 2) {
-        return (
-            <View style={[mediaGridStyles.container, mediaGridStyles.row]}>
-                {renderCell(media[0], [mediaGridStyles.rowCell, mediaGridStyles.gapRight])}
-                {renderCell(media[1], mediaGridStyles.rowCell)}
-            </View>
-        );
-    }
-
-    if (count === 3) {
-        return (
-            <View style={[mediaGridStyles.container, mediaGridStyles.row]}>
-                {renderCell(media[0], [mediaGridStyles.rowCell, mediaGridStyles.gapRight])}
-                <View style={mediaGridStyles.rowCell}>
-                    {renderCell(media[1], mediaGridStyles.half)}
-                    {renderCell(media[2], [mediaGridStyles.half, { marginTop: 3 }])}
-                </View>
-            </View>
-        );
-    }
-
-    // 4 or more: 2x2 grid, "+N" overlay on the last visible cell if there are extras.
-    const visible = media.slice(0, 4);
-    const extraCount = count - 4;
-    return (
-        <View style={[mediaGridStyles.container, mediaGridStyles.grid]}>
-            {visible.map((block, i) => {
-                const isLastCell = i === 3 && extraCount > 0;
-                return renderCell(block, mediaGridStyles.gridCell, isLastCell ? extraCount : null);
-            })}
-        </View>
-    );
-};
+import { formatPostTimestamp } from '../utils/date';
+import { getMediaBlocks, getTextBlocks } from '../utils/postBlocks';
 
 export const PostScreen = ({ route }) => {
     const post = route.params?.post;
-    const [refreshing, setRefreshing] = useState(false);
-    const [isLiked, setIsLiked] = useState(post?.isLiked);
-    const [isBookmarked, setIsBookmarked] = useState(post?.isBookmarked ?? false);
-    const updatePost = usePStore(state => state.updatePost);
     const navigation = useNavigation();
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
-    const [postComments, setPostComments] = useState();
-    const [galleryViewerVisible, setGalleryViewerVisible] = useState(false);
-    const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
-    const [dropdownVisible, setDropdownVisible] = useState(false);
-    const [selectedOption, setSelectedOption] = useState(OPTIONS[1]);
-    const [dropdownPos, setDropdownPos] = useState({ x: 0, y: 0, width: 0, height: 0 });
-    const buttonRef = useRef(null);
+    const updatePost = usePStore(state => state.updatePost);
 
     // 'gallery' → caption + grid layout. Anything else ('inline', missing,
     // etc.) → blocks render in original authored order, text/media interleaved.
     const isGalleryMode = post?.layout_mode === 'gallery';
 
-    // Guarded against post being undefined — these still run before the
-    // early return below since hooks can't be called conditionally.
-    const mediaBlocks = useMemo(
-        () => post?.postblocks?.filter(b => getBlockType(b) === 'image' || getBlockType(b) === 'video') ?? [],
-        [post]
-    );
-    const textBlocks = useMemo(
-        () => post?.postblocks?.filter(b => getBlockType(b) === 'text') ?? [],
-        [post]
-    );
+    // Guarded against post being undefined — hooks run before the early
+    // return below since they can't be called conditionally.
+    const mediaBlocks = useMemo(() => getMediaBlocks(post?.postblocks), [post]);
+    const textBlocks = useMemo(() => getTextBlocks(post?.postblocks), [post]);
 
-    const handleOpenDropdown = () => {
-        buttonRef.current?.measureInWindow((x, y, width, height) => {
-            setDropdownPos({ x, y, width, height });
-            setDropdownVisible(true);
-        });
-    };
+    const gallery = useGalleryViewer(mediaBlocks);
+    const { comments, sort, setSort, refreshing, refresh } = usePostComments(post, updatePost);
+    const { isLiked, isBookmarked, toggleLike, toggleBookmark } = usePostActions(post, updatePost);
 
-    const handleSelectOption = (option) => {
-        setSelectedOption(option);
-        setDropdownVisible(false);
-        fetchComments(option);
-    };
-
-    const fetchComments = useCallback(async (option = OPTIONS[1]) => {
-        const response = await getPostComments(post.id, option.value);
-        setPostComments(response.comments);
-        if (response.total_count !== post.commentCount) {
-            updatePost(post.id, { commentCount: response.total_count });
-        }
-    }, [post, updatePost]);
-
-    // Finds the block's index within the POST's own mediaBlocks. Only
-    // correct for the post's own media — never call this with a comment's
-    // block id, since it won't be found and will silently fall back to 0.
-    const openGallery = useCallback((blockId) => {
-        const correctIndex = mediaBlocks.findIndex(b => b.id === blockId);
-        setGalleryInitialIndex(correctIndex >= 0 ? correctIndex : 0);
-        setGalleryViewerVisible(true);
-        // StatusBar.setHidden(true);
-    }, [mediaBlocks]);
-
-    const closeGallery = () => {
-        setGalleryViewerVisible(false);
-        // StatusBar.setHidden(false);
-    };
-
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await fetchComments(selectedOption);
-        setRefreshing(false);
-    };
-
-    useEffect(() => {
-        fetchComments();
-    }, [fetchComments]);
-
-    const handleLikePress = async () => {
-        const previousLiked = isLiked;
-        setIsLiked(!previousLiked); // optimistic update
-        try {
-            await togglePostLike(post.id, post.likesCount, updatePost);
-        } catch (err) {
-            console.log(err);
-            setIsLiked(previousLiked); // roll back on failure
-        }
-    };
-
-    const handleBookmarkPress = async () => {
-        const next = !isBookmarked;
-        setIsBookmarked(next);
-        updatePost(post.id, { isBookmarked: next });
-        const ok = await bookmarkTarget('post', post.id);
-        if (!ok) {
-            setIsBookmarked(!next);
-            updatePost(post.id, { isBookmarked: !next });
-        }
-    };
-
-    // Renders the POST's own top-level blocks (both gallery-mode caption
-    // text and inline-mode interleaved blocks route through here). Media
-    // is wrapped to open the fullscreen GalleryViewer at the correct index
-    // — safe because mediaBlocks here is guaranteed to be the post's own.
-    const renderPostBlock = useCallback((block) => {
-        const type = getBlockType(block);
-        switch (type) {
-            case 'text':
-                return (
-                    <View style={styles.content} key={block.id}>
-                        <Text style={styles.textBlock}>{block.content}</Text>
-                    </View>
-                );
-            case 'image':
-                return (
-                    <Pressable
-                        key={block.id}
-                        onPress={() => openGallery(block.id)}
-                        style={styles.mediaWrapper}
-                    >
-                        <Image
-                            source={{ uri: block.content }}
-                            style={styles.inlineMedia}
-                            resizeMode="cover"
-                        />
-                        {mediaBlocks[0]?.id === block.id && mediaBlocks.length > 1 && (
-                            <View style={styles.galleryIndicator}>
-                                <Icon name="photo-library" size={20} color="#fff" />
-                            </View>
-                        )}
-                    </Pressable>
-                );
-            case 'video':
-                return (
-                    <Pressable
-                        key={block.id}
-                        onPress={() => openGallery(block.id)}
-                        style={styles.mediaWrapper}
-                    >
-                        <View pointerEvents="none">
-                            <CustomSocialVideoPlayer block={block} post={post} />
-                        </View>
-                        {mediaBlocks[0]?.id === block.id && mediaBlocks.length > 1 && (
-                            <View style={styles.galleryIndicator}>
-                                <Icon name="photo-library" size={20} color="#fff" />
-                            </View>
-                        )}
-                    </Pressable>
-                );
-            default:
-                return null;
-        }
-    }, [post, mediaBlocks, styles, openGallery]);
+    const renderBlock = useCallback((block) => (
+        <PostBlock
+            key={block.id}
+            block={block}
+            post={post}
+            mediaBlocks={mediaBlocks}
+            onOpenMedia={gallery.open}
+        />
+    ), [post, mediaBlocks, gallery.open]);
 
     const renderItem = useCallback(({ item }) => (
         <CommentItem comment={item} post={post} />
     ), [post]);
 
-    if (!post) return null;
+    if (!post) {return null;}
 
     return (
         <View style={styles.container}>
-
             <ScreenHeader title={`${post.user?.username}'s post`} titleInBackButton />
 
             <FlatList
-                style={{ flex: 1 }}
-                data={postComments}
+                style={styles.list}
+                data={comments}
                 keyExtractor={(item) => item.id}
                 renderItem={renderItem}
                 bounces={true}
@@ -292,7 +67,7 @@ export const PostScreen = ({ route }) => {
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
-                        onRefresh={onRefresh}
+                        onRefresh={refresh}
                         colors={[colors.accent]}
                         tintColor={colors.accent}
                     />
@@ -310,153 +85,61 @@ export const PostScreen = ({ route }) => {
 
                             {isGalleryMode ? (
                                 <>
-                                    <View style={styles.postTextContainer}>
-                                        {textBlocks.map(renderPostBlock)}
+                                    <View style={styles.blocksContainer}>
+                                        {textBlocks.map(renderBlock)}
                                     </View>
                                     {mediaBlocks.length > 0 && (
-                                        <MediaGrid media={mediaBlocks} onPressItem={openGallery} />
+                                        <MediaGrid media={mediaBlocks} onPressItem={gallery.open} />
                                     )}
                                 </>
                             ) : (
-                                <View style={styles.postBlocksContainer}>
-                                    {post.postblocks.map(renderPostBlock)}
+                                <View style={styles.blocksContainer}>
+                                    {post.postblocks.map(renderBlock)}
                                 </View>
                             )}
 
                             <View style={styles.timestampContainer}>
-                                <Text style={styles.timestamp}>
-                                    {new Date(post.createdAt).toLocaleString('en-US', {
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                        hour12: true
-                                    })} • {new Date(post.createdAt).toLocaleString('en-US', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                        year: '2-digit'
-                                    })}
-                                </Text>
+                                <Text style={styles.timestamp}>{formatPostTimestamp(post.createdAt)}</Text>
                             </View>
-                            <View style={styles.actionBar}>
-                                <Pressable
-                                    android_disableSound={true}
-                                    style={styles.actionButton}
-                                    onPress={() =>
-                                        navigation.navigate("MainApp", { screen: 'CommentComposerScreen', params: { post } })
-                                    }
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Reply to post"
-                                >
-                                    <Icon name="chat-bubble-outline" size={20} color={colors.textSecondary} />
-                                    <Text style={styles.actionText}>{post.commentCount}</Text>
-                                </Pressable>
-                                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
-                                    <Icon name="repeat" size={20} color={colors.textSecondary} />
-                                    <Text style={styles.actionText}>0</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.actionButton}
-                                    onPress={handleLikePress}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={isLiked ? 'Unlike post' : 'Like post'}
-                                >
-                                    <Icon
-                                        name={isLiked ? "favorite" : "favorite-border"}
-                                        size={20}
-                                        color={isLiked ? colors.danger : colors.textSecondary}
-                                    />
-                                    <Text style={styles.actionText}>{post.likesCount}</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.actionButton}
-                                    onPress={handleBookmarkPress}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark post'}
-                                >
-                                    <Icon
-                                        name={isBookmarked ? "bookmark" : "bookmark-border"}
-                                        size={20}
-                                        color={isBookmarked ? colors.accent : colors.textSecondary}
-                                    />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
-                                    <Icon name="share" size={20} color={colors.textSecondary} />
-                                </TouchableOpacity>
-                            </View>
+
+                            <PostDetailActions
+                                commentCount={post.commentCount}
+                                likesCount={post.likesCount}
+                                isLiked={isLiked}
+                                isBookmarked={isBookmarked}
+                                onReply={() => navigation.navigate('MainApp', {
+                                    screen: 'CommentComposerScreen',
+                                    params: { post },
+                                })}
+                                onLike={toggleLike}
+                                onBookmark={toggleBookmark}
+                            />
                         </View>
-                        <View style={styles.CommentTreeHeader}>
-                            <Pressable
-                                android_disableSound={true}
-                                ref={buttonRef}
-                                style={styles.CommentTreeHeaderButton}
-                                onPress={handleOpenDropdown}
-                            >
-                                <Text style={styles.dropdownText}>{selectedOption.name}</Text>
-                            </Pressable>
-                        </View>
+                        <SortDropdown options={COMMENT_SORT_OPTIONS} selected={sort} onSelect={setSort} />
                     </>
                 }
                 ListEmptyComponent={
-                    postComments && postComments.length === 0 ? (
+                    comments && comments.length === 0 ? (
                         <Text style={styles.emptyText}>No comments yet</Text>
                     ) : null
                 }
-                ListFooterComponent={
-                    <View>
-                        <Text style={{ margin: 'auto', fontSize: 28, color: colors.textSecondary }}>•</Text>
-                    </View>
-                }
+                ListFooterComponent={<Text style={styles.footerDot}>•</Text>}
             />
-            {dropdownVisible && (
-                <>
-                    <Pressable
-                        android_disableSound={true}
-                        style={StyleSheet.absoluteFill}
-                        onPress={() => setDropdownVisible(false)}
-                    />
-                    <View style={[
-                        styles.dropdownContainer,
-                        {
-                            position: 'absolute',
-                            top: dropdownPos.y + dropdownPos.height + 1,
-                            right: 30,
-                        }
-                    ]}>
-                        {OPTIONS.map((option, index) => (
-                            <Pressable
-                                android_disableSound={true}
-                                key={index}
-                                style={[
-                                    styles.dropdownOption,
-                                    selectedOption.value === option.value && styles.selectedOption
-                                ]}
-                                onPress={() => handleSelectOption(option)}
-                            >
-                                <Text style={[
-                                    styles.dropdownText,
-                                    selectedOption.value === option.value && styles.selectedText
-                                ]}>
-                                    {option.name}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </View>
-                </>
-            )}
 
-            {galleryViewerVisible && (
+            {gallery.visible && (
                 <Modal
-                    visible={galleryViewerVisible}
+                    visible={gallery.visible}
                     animationType="none"
                     transparent={true}
                     statusBarTranslucent={true}
-                    onRequestClose={closeGallery}
+                    onRequestClose={gallery.close}
                 >
-                    <GestureHandlerRootView style={{ flex: 1 }}>
+                    <GestureHandlerRootView style={styles.flex}>
                         <GalleryViewer
                             mediaBlocks={mediaBlocks}
-                            initialIndex={galleryInitialIndex}
+                            initialIndex={gallery.initialIndex}
                             post={post}
-                            onClose={closeGallery}
+                            onClose={gallery.close}
                         />
                     </GestureHandlerRootView>
                 </Modal>
@@ -466,36 +149,21 @@ export const PostScreen = ({ route }) => {
 };
 
 const createStyles = (colors) => StyleSheet.create({
+    flex: {
+        flex: 1,
+    },
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+    list: {
+        flex: 1,
     },
     postContainer: {
         backgroundColor: colors.surface,
         padding: 15,
         paddingBottom: 0,
         width: '100%',
-    },
-    header: {
-        marginTop: 0,
-        backgroundColor: colors.surface,
-        width: '100%',
-        flexDirection: 'row',
-        paddingBottom: 10,
-        height: 100,
-        zIndex: 1,
-    },
-    headerText: {
-        margin: 'auto',
-        marginLeft: 10,
-        marginTop: 70,
-        fontSize: 18,
-        fontWeight: '0'
-    },
-    backButton: {
-        marginLeft: 10,
-        marginTop: 70,
-        borderRadius: 50,
     },
     postHeader: {
         flexDirection: 'row',
@@ -508,86 +176,24 @@ const createStyles = (colors) => StyleSheet.create({
         borderRadius: 20,
         marginRight: 10,
         borderWidth: 1,
-        borderColor: colors.divider
+        borderColor: colors.divider,
     },
     username: {
         fontWeight: 'bold',
         fontSize: 16,
         color: colors.text,
     },
-    postTextContainer: {
-        marginBottom: 4,
-    },
-    postBlocksContainer: {
+    blocksContainer: {
         marginBottom: 4,
     },
     timestampContainer: {
         borderBottomWidth: 1,
         borderBottomColor: colors.divider,
-        paddingBottom: 10
+        paddingBottom: 10,
     },
     timestamp: {
         color: colors.textSecondary,
         fontSize: 14,
-    },
-    content: {
-        marginBottom: 8,
-        padding: 5,
-        paddingBottom: 0
-    },
-    textBlock: {
-        fontSize: 15,
-        lineHeight: 20,
-        color: colors.text,
-    },
-    readMore: {
-        color: colors.accent,
-        marginTop: 4,
-        fontWeight: '500',
-    },
-    inlineMedia: {
-        width: '100%',
-        height: 180,
-        borderRadius: 8,
-        marginTop: 4,
-        marginBottom: 4,
-    },
-    mediaWrapper: {
-        position: 'relative',
-    },
-    galleryIndicator: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    footer: {
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
-        paddingTop: 8,
-    },
-    actionBar: {
-        flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
-        paddingTop: 10,
-        paddingBottom: 10,
-        gap: 56,
-        width: '100%',
-        alignItems: 'center',
-        marginBottom: 0,
-    },
-    actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 5,
-    },
-    actionText: {
-        marginLeft: 4,
-        color: colors.textSecondary,
     },
     emptyText: {
         textAlign: 'center',
@@ -596,170 +202,9 @@ const createStyles = (colors) => StyleSheet.create({
         marginTop: 24,
         marginBottom: 12,
     },
-    textInput: {
-        backgroundColor: colors.surface,
-        padding: 10,
-        borderColor: colors.divider,
-        borderWidth: 1,
-        margin: 12,
-    },
-    commentInputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderTopColor: colors.divider,
-        borderBottomColor: colors.divider,
-        backgroundColor: colors.surface,
-        gap: 8,
-    },
-    commentAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-    },
-    commentInput: {
-        flex: 1,
-        minHeight: 38,
-        maxHeight: 100,
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        fontSize: 14,
-        color: colors.text,
-        lineHeight: 20,
-    },
-    sendButton: {
-        width: 50,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.accent,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    buttonText: {
-        textAlign: 'center',
-        fontSize: 14,
-    },
-    CommentTreeHeader: {
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
-    },
-    CommentTreeHeaderButton: {
+    footerDot: {
         margin: 'auto',
-        marginRight: 30,
-        minWidth: 110,
-        paddingHorizontal: 6,
-        paddingVertical: 6,
-        textAlign: 'center'
-    },
-    dropdownArrow: {
-        fontSize: 12,
+        fontSize: 28,
         color: colors.textSecondary,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        justifyContent: 'flex-start',
-        alignItems: 'flex-end',
-    },
-    dropdownContainer: {
-        backgroundColor: colors.surface,
-        minWidth: 110,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 3,
-        overflow: 'hidden',
-    },
-    dropdownOption: {
-        paddingVertical: 12,
-        paddingHorizontal: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
-    },
-    selectedOption: {
-        backgroundColor: colors.iconBg,
-    },
-    dropdownText: {
-        fontSize: 14,
-        color: colors.text,
-    },
-    selectedText: {
-        fontWeight: '600',
-    },
-});
-
-const mediaGridStyles = StyleSheet.create({
-    container: {
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginVertical: 8,
-    },
-    row: {
-        flexDirection: 'row',
-        height: 240,
-    },
-    grid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        height: 280,
-    },
-    cell: {
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    single: {
-        width: '100%',
-        height: 400,
-    },
-    rowCell: {
-        flex: 1,
-        height: '100%',
-    },
-    gapRight: {
-        marginRight: 3,
-    },
-    half: {
-        flex: 1,
-        width: '100%',
-    },
-    gridCell: {
-        width: '50%',
-        height: '50%',
-        padding: 1.5,
-    },
-    cellImage: {
-        width: '100%',
-        height: '100%',
-    },
-    videoPlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#000',
-    },
-    playBadge: {
-        ...StyleSheet.absoluteFillObject,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.25)',
-    },
-    moreOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    moreOverlayText: {
-        color: '#fff',
-        fontSize: 22,
-        fontWeight: '700',
     },
 });

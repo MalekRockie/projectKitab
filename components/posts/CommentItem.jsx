@@ -8,7 +8,7 @@ import { useTheme } from '../../theme/useTheme';
 import { darkColors } from '../../theme/colors';
 import { openUserProfile } from '../../utils/profileNavigation';
 
-const getBlockType = (block) => block.blockType || block.block_type;
+import { getBlockType } from '../../utils/postBlocks';
 
 const getTimeAgo = (dateString) => {
     const now = new Date();
