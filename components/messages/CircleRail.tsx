@@ -48,7 +48,7 @@ const CIRCLE_COLORS = [
     '#2D6F91',
 ];
 
-const getCircleColor = (circleId: string) => {
+export const getCircleColor = (circleId: string) => {
     const hash = Array.from(circleId).reduce((value, character) => (
         (value * 31 + character.charCodeAt(0)) % 1000003
     ), 0);

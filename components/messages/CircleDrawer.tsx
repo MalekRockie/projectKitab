@@ -28,11 +28,14 @@ type CircleDrawerProps = {
     onChooseServer: (server: Server) => void;
     onChooseRoom: (roomId: string) => void;
     onOpenDirect: () => void;
+    circleHeader?: React.ReactNode;
+    memberCount?: number;
+    onOpenMembers?: () => void;
 };
 
 export default function CircleDrawer({
     drawer, circles, servers, server, roomId, folders, loading, error, onRetry, onCreateCircle, onManageFolders, onDropCircle, onReorder,
-    onChooseServer, onChooseRoom, onOpenDirect,
+    onChooseServer, onChooseRoom, onOpenDirect, circleHeader, memberCount, onOpenMembers,
 }: CircleDrawerProps) {
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
@@ -63,12 +66,20 @@ export default function CircleDrawer({
                     <GestureDetector gesture={drawer.dragGesture}>
                         <View style={styles.channels}>
                             <View style={styles.heading}>
-                                <Text numberOfLines={1} style={styles.circleName}>{server?.name ?? 'Circles'}</Text>
+                                <View style={styles.headingText}>
+                                    <Text numberOfLines={1} style={styles.circleName}>{server?.name ?? 'Circles'}</Text>
+                                    {memberCount !== undefined ? (
+                                        <Pressable onPress={onOpenMembers} accessibilityRole="button" accessibilityLabel="View members">
+                                            <Text style={styles.memberCount}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>
+                                        </Pressable>
+                                    ) : null}
+                                </View>
                                 <View style={styles.headingActions}>
                                     <Pressable onPress={onOpenDirect} style={styles.close} accessibilityRole="button" accessibilityLabel="Open direct messages"><Icon name="chat-bubble-outline" size={19} color={colors.textSecondary} /></Pressable>
                                     <Pressable onPress={drawer.closeDrawer} style={styles.close} accessibilityRole="button" accessibilityLabel="Close Circle and channel navigation"><Icon name="close" size={21} color={colors.textSecondary} /></Pressable>
                                 </View>
                             </View>
+                            {circleHeader}
                             {server ? <>
                                 <Text style={styles.sectionLabel}>CHANNELS</Text>
                                 <ScrollView showsVerticalScrollIndicator={false}>
@@ -97,7 +108,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     channels: { flex: 1, minWidth: 0, paddingHorizontal: 10, paddingTop: 12, backgroundColor: colors.background },
     heading: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider, marginBottom: 12 },
     headingActions: { flexDirection: 'row' },
-    circleName: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '700' },
+    headingText: { flex: 1 },
+    circleName: { color: colors.text, fontSize: 14, fontWeight: '700' },
+    memberCount: { color: colors.textSecondary, fontSize: 11, marginTop: 1 },
     close: { width: 34, height: 36, alignItems: 'center', justifyContent: 'center' },
     sectionLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingBottom: 8 },
     emptyState: { paddingHorizontal: 10, paddingTop: 12, gap: 8 },

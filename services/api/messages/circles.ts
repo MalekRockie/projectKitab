@@ -10,6 +10,21 @@ export type Circle = {
     folder_id: string | null;
 };
 
+export type CircleDetails = {
+    id: string;
+    owner_id: string;
+    name: string;
+    icon_url: string | null;
+    is_animated_icon: boolean;
+    banner_url: string | null;
+    member_count: number;
+    is_owner: boolean;
+};
+
+// Owner-only. Send just the fields being changed.
+export type CircleUpdate = Partial<Pick<CircleDetails, 'name' | 'icon_url' | 'is_animated_icon' | 'banner_url'>>;
+
+
 export type CircleFolder = {
     id: string;
     name: string;
@@ -49,6 +64,72 @@ export async function getCircles(): Promise<Circle[]> {
     const response = await privateApi.get('/api/p/v1/circles');
     if (!Array.isArray(response.data?.circles)) {throw new Error('Invalid circles response');}
     return response.data.circles;
+}
+
+export async function getCircle(circleId: string): Promise<CircleDetails> {
+    const response = await privateApi.get(`/api/p/v1/circles/${encodeURIComponent(circleId)}`);
+    const circle = response.data?.circle ?? response.data;
+    if (!circle || typeof circle.id !== 'string' || typeof circle.name !== 'string') {
+        throw new Error('Invalid circle details response');
+    }
+    return {
+        id: circle.id,
+        owner_id: circle.owner_id,
+        name: circle.name,
+        icon_url: circle.icon_url ?? null,
+        is_animated_icon: Boolean(circle.is_animated_icon),
+        banner_url: circle.banner_url ?? null,
+        member_count: Number(circle.member_count) || 0,
+        is_owner: Boolean(circle.is_owner),
+    };
+}
+
+export async function updateCircle(circleId: string, update: CircleUpdate): Promise<void> {
+    await privateApi.patch(`/api/p/v1/circles/${encodeURIComponent(circleId)}`, update);
+}
+
+export type CircleMember = {
+    user_id: string;
+    username: string;
+    display_name?: string | null;
+    nickname?: string | null;
+    joined_at: string;
+    is_owner: boolean;
+    role_ids: string[];
+};
+
+export type CircleMembersPage = {
+    members: CircleMember[];
+    page: number;
+    limit: number;
+};
+
+export async function getCircleMembers(circleId: string, page = 1, limit = 50): Promise<CircleMembersPage> {
+    const response = await privateApi.get(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members`, { params: { page, limit } });
+    const data = response.data ?? {};
+    return {
+        members: Array.isArray(data.members) ? data.members : [],
+        page: Number(data.page) || page,
+        limit: Number(data.limit) || limit,
+    };
+}
+
+// Pass '@me' as userId to change your own nickname.
+export async function updateCircleMemberNickname(circleId: string, userId: string, nickname: string): Promise<void> {
+    await privateApi.patch(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(userId)}`, { nickname });
+}
+
+export async function deleteCircle(circleId: string): Promise<void> {
+    await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}`);
+}
+
+export async function leaveCircle(circleId: string): Promise<void> {
+    await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/@me`);
+}
+
+// Owner-only.
+export async function kickCircleMember(circleId: string, userId: string): Promise<void> {
+    await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(userId)}`);
 }
 
 export async function createCircle(name: string): Promise<void> {

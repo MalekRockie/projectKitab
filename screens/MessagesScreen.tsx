@@ -26,6 +26,7 @@ import {
     buildCircleLayout,
     createCircle,
     createCircleFolder,
+    deleteCircle,
     deleteCircleFolder,
     getCircleFolders,
     getCircles,
@@ -39,6 +40,10 @@ import { INITIAL_CHAT_STATE, SERVERS, Server } from '../data/circles';
 import ChannelRow from '../components/messages/ChannelRow';
 import ChatView from '../components/messages/ChatView';
 import CircleDrawer from '../components/messages/CircleDrawer';
+import CircleHeader from '../components/messages/CircleHeader';
+import CircleEditDialog from '../components/messages/CircleEditDialog';
+import CircleMembersDialog from '../components/messages/CircleMembersDialog';
+import useCircleDetails from '../components/messages/useCircleDetails';
 import CircleManager from '../components/messages/CircleManager';
 import CircleNameDialog from '../components/messages/CircleNameDialog';
 import CircleRail, { CircleDragEntity, CircleDropTarget } from '../components/messages/CircleRail';
@@ -219,6 +224,23 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
 
     const server = servers.find(item => item.id === serverId) ?? servers[0] ?? null;
     const room = server?.rooms.find(item => item.id === roomId) ?? server?.rooms[0] ?? null;
+    const { details: circleDetails, save: saveCircleDetails } = useCircleDetails(server?.id ?? '');
+    const [circleEditOpen, setCircleEditOpen] = useState(false);
+    const [circleMembersOpen, setCircleMembersOpen] = useState(false);
+    const renderCircleHeader = (showName: boolean) => server ? (
+        <CircleHeader
+            circleId={server.id}
+            name={circleDetails?.name ?? server.name}
+            details={circleDetails}
+            canEdit={Boolean(circleDetails?.is_owner)}
+            showName={showName}
+            onEdit={() => setCircleEditOpen(true)}
+            onOpenMembers={() => setCircleMembersOpen(true)}
+        />
+    ) : null;
+    const circleHeaderNode = renderCircleHeader(true);
+    // The drawer's top bar already shows the name and member count.
+    const drawerHeaderNode = renderCircleHeader(false);
     const activeConversation = conversations.find(item => item.id === activeConversationId) ?? null;
     const activeChatId = room?.id ?? '';
     const activeMessages = mode === 'servers'
@@ -533,7 +555,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                         <Text style={styles.retryText}>Try again</Text>
                     </Pressable>
                 ) : null}
-                {server ? <Text style={styles.serverName}>{server.name}</Text> : null}
+                {circleHeaderNode}
                 {server?.rooms.map(item => (
                     <ChannelRow key={item.id} name={item.name} active={room?.id === item.id} unread={item.id === 'general' && server.id === servers[0]?.id} onPress={() => setRoomId(item.id)} />
                 ))}
@@ -633,6 +655,9 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                                     onChooseServer={chooseServer}
                                     onChooseRoom={nextRoomId => { setRoomId(nextRoomId); drawer.closeDrawer(); }}
                                     onOpenDirect={() => { showDirect(); drawer.closeDrawer(); }}
+                                    circleHeader={drawerHeaderNode}
+                                    memberCount={circleDetails?.member_count}
+                                    onOpenMembers={() => setCircleMembersOpen(true)}
                                 />
                             ) : null}
                         </>}
@@ -645,6 +670,29 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 onClose={() => setCircleManagerOpen(false)}
                 onRenameFolder={(folderId, name) => runCircleMutation(() => renameCircleFolder(folderId, name))}
                 onDeleteFolder={folderId => runCircleMutation(() => deleteCircleFolder(folderId))}
+            />
+            <CircleEditDialog
+                visible={circleEditOpen}
+                details={circleDetails}
+                onClose={() => setCircleEditOpen(false)}
+                onSubmit={async update => {
+                    if (!circleDetails) {return;}
+                    await saveCircleDetails(circleDetails.id, update);
+                    await refreshCircles();
+                }}
+                onDelete={async () => {
+                    if (!circleDetails) {return;}
+                    await deleteCircle(circleDetails.id);
+                    await refreshCircles();
+                }}
+            />
+            <CircleMembersDialog
+                visible={circleMembersOpen}
+                circleId={server?.id ?? ''}
+                circleName={circleDetails?.name ?? server?.name ?? ''}
+                currentUserId={currentUserId}
+                isCircleOwner={Boolean(circleDetails?.is_owner)}
+                onClose={() => setCircleMembersOpen(false)}
             />
             <CircleNameDialog
                 visible={circleNameDialogOpen}
