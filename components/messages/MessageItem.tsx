@@ -1,18 +1,21 @@
 import React, { memo, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../theme/useTheme';
 import { ThemeColors } from '../../theme/colors';
 import { Message } from '../../services/messages/messageMapping';
 import Avatar, { AVATAR_TINTS } from './Avatar';
 
-function MessageItem({ message }: { message: Message }) {
+function MessageItem({ message, onPressAvatar }: { message: Message; onPressAvatar?: (message: Message) => void }) {
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const initials = message.own ? 'ME' : message.author.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
+    const avatar = <Avatar initials={initials} tint={message.own ? AVATAR_TINTS.own : AVATAR_TINTS.other} size={38} />;
 
     return (
         <View style={styles.row}>
-            <Avatar initials={initials} tint={message.own ? AVATAR_TINTS.own : AVATAR_TINTS.other} size={38} />
+            {onPressAvatar ? (
+                <Pressable onPress={() => onPressAvatar(message)} accessibilityRole="button" accessibilityLabel={`View ${message.author}'s profile`}>{avatar}</Pressable>
+            ) : avatar}
             <View style={styles.content}>
                 <View style={styles.meta}>
                     <Text style={[styles.author, message.own && styles.ownAuthor]}>{message.author}</Text>

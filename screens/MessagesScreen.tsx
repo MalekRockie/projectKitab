@@ -42,6 +42,8 @@ import ChatView from '../components/messages/ChatView';
 import CircleDrawer from '../components/messages/CircleDrawer';
 import CircleHeader from '../components/messages/CircleHeader';
 import CircleEditDialog from '../components/messages/CircleEditDialog';
+import CircleProfileSheet from '../components/messages/CircleProfileSheet';
+import { CircleProfile, buildPlaceholderProfile } from '../components/messages/circleProfile';
 import CircleMembersDialog from '../components/messages/CircleMembersDialog';
 import useCircleDetails from '../components/messages/useCircleDetails';
 import CircleManager from '../components/messages/CircleManager';
@@ -58,6 +60,9 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const wide = width >= 760;
     const styles = useMemo(() => createStyles(colors, wide), [colors, wide]);
     const currentUserId = useCUserStore(state => state.userId);
+    const currentUsername = useCUserStore(state => state.username);
+    const currentDisplayName = useCUserStore(state => state.displayName);
+    const [profile, setProfile] = useState<CircleProfile | null>(null);
     const [mode, setMode] = useState<'servers' | 'direct'>('servers');
     const [serverId, setServerId] = useState('');
     const [roomId, setRoomId] = useState('');
@@ -478,6 +483,10 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
         scrollToLatest();
     };
 
+    const openProfile = useCallback((message: Message) => {
+        setProfile(buildPlaceholderProfile(message, { displayName: currentDisplayName, username: currentUsername }));
+    }, [currentDisplayName, currentUsername]);
+
     const renderChat = (handlers: { onBack?: () => void; onOpenChannels?: () => void } = {}) => {
         const direct = mode === 'direct';
         return (
@@ -507,6 +516,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     connection: direct ? { status: socketStatus, onReconnect: reconnectSocket } : undefined,
                 }}
                 {...handlers}
+                onPressAvatar={direct ? undefined : openProfile}
             />
         );
     };
@@ -703,6 +713,14 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     await refreshCircles();
                 }}
             />
+        {profile ? (
+                <CircleProfileSheet
+                    profile={profile}
+                    circleName={circleDetails?.name ?? server?.name ?? 'this circle'}
+                    onClose={() => setProfile(null)}
+                    onEditProfile={() => { setProfile(null); setCircleMembersOpen(true); }}
+                />
+            ) : null}
         </SafeAreaView>
     );
 }

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/useTheme';
@@ -11,7 +11,6 @@ import MessageItem from './MessageItem';
 // In the inverted list index 0 is the newest message: keep older rows still, but follow new ones when within 100px of the bottom.
 const MESSAGE_LIST_ANCHORING = { minIndexForVisible: 1, autoscrollToTopThreshold: 100 };
 
-const renderMessage = ({ item }: { item: Message }) => <MessageItem message={item} />;
 const keyExtractor = (item: Message) => item.id;
 
 type ChatViewProps = {
@@ -25,6 +24,7 @@ type ChatViewProps = {
     leading?: 'hash' | { initials: string };
     onBack?: () => void;
     onOpenChannels?: () => void;
+    onPressAvatar?: (message: Message) => void;
     loading?: boolean;
     error?: string | null;
     onRetry?: () => void;
@@ -34,10 +34,11 @@ type ChatViewProps = {
 };
 
 export default function ChatView({
-    wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels,
+    wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels, onPressAvatar,
     loading = false, error = null, onRetry, emptyTitle, emptyCopy, composer,
 }: ChatViewProps) {
     const colors = useTheme();
+    const renderMessage = useCallback(({ item }: { item: Message }) => <MessageItem message={item} onPressAvatar={onPressAvatar} />, [onPressAvatar]);
     const styles = useMemo(() => createStyles(colors, wide), [colors, wide]);
     const newestFirst = useMemo(() => [...messages].reverse(), [messages]);
 
