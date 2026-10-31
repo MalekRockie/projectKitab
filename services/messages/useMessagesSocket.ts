@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConversationMessage } from '../api/messages/conversations';
+import { CircleChannelMessage } from '../api/messages/circles';
 import { getMessagesWebSocketUrl } from '../api/messages/socketConfig';
 import { useUTStore } from '../storage/store/tstore';
-import { findIncomingMessage } from './messageMapping';
+import { findIncomingCircleChannelMessage, findIncomingMessage } from './messageMapping';
 
 export type SocketStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
-export function useMessagesSocket(enabled: boolean, onMessage: (message: ConversationMessage) => void) {
+export function useMessagesSocket(
+    enabled: boolean,
+    onMessage: (message: ConversationMessage | CircleChannelMessage) => void,
+) {
     const userToken = useUTStore(state => state.userToken);
     const [status, setStatus] = useState<SocketStatus>('idle');
     const [retryCount, setRetryCount] = useState(0);
@@ -38,7 +42,7 @@ export function useMessagesSocket(enabled: boolean, onMessage: (message: Convers
         socket.onmessage = event => {
             try {
                 const payload = JSON.parse(event.data);
-                const incoming = findIncomingMessage(payload);
+                const incoming = findIncomingMessage(payload) ?? findIncomingCircleChannelMessage(payload);
                 if (!incoming) {
                     console.warn('Ignoring unrecognized direct-message socket frame', {
                         event: payload?.event,
@@ -49,7 +53,7 @@ export function useMessagesSocket(enabled: boolean, onMessage: (message: Convers
                 }
                 onMessageRef.current(incoming);
             } catch (error) {
-                console.warn('Could not parse direct messaging socket event', error);
+                console.warn('Could not parse messaging socket event', error);
             }
         };
 

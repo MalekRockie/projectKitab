@@ -1,6 +1,6 @@
 import { Message } from '../services/messages/messageMapping';
 
-export type Room = { id: string; name: string; messages: Message[] };
+export type Room = { id: string; name: string; messages: Message[]; categoryId?: string | null };
 export type Server = { id: string; name: string; initials: string; tint: string; rooms: Room[]; folderId?: string | null };
 
 // Sample channel data remains local until circle channel endpoints are available.

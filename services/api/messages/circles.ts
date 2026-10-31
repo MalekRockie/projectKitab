@@ -10,6 +10,60 @@ export type Circle = {
     folder_id: string | null;
 };
 
+export type CircleChannelCategory = {
+    id: string;
+    name: string;
+    display_order: number;
+};
+
+export type CircleChannel = {
+    id: string;
+    category_id: string | null;
+    name: string;
+    type: string;
+    topic?: string | null;
+    is_nsfw: boolean;
+    slow_mode_seconds: number;
+    display_order: number;
+    created_at: string;
+};
+
+export type CircleChannelsResponse = {
+    categories: CircleChannelCategory[];
+    channels: CircleChannel[];
+};
+
+export type CircleChannelMessage = {
+    id: string;
+    channel_id: string;
+    sender: {
+        user_id: string;
+        username: string;
+        display_name?: string | null;
+        nickname?: string | null;
+        avatar_url?: string | null;
+        is_member: boolean;
+    };
+    content: string;
+    is_deleted: boolean;
+    is_edited: boolean;
+    is_pinned: boolean;
+    created_at: string;
+};
+
+export type CircleChannelMessagesResponse = {
+    messages: CircleChannelMessage[];
+    has_more: boolean;
+    next_before: string | null;
+    next_before_id: string | null;
+};
+
+export type CircleChannelMessagesOptions = {
+    limit?: number;
+    before?: string;
+    before_id?: string;
+};
+
 export type CircleDetails = {
     id: string;
     owner_id: string;
@@ -64,6 +118,40 @@ export async function getCircles(): Promise<Circle[]> {
     const response = await privateApi.get('/api/p/v1/circles');
     if (!Array.isArray(response.data?.circles)) {throw new Error('Invalid circles response');}
     return response.data.circles;
+}
+
+export async function getCircleChannels(circleId: string): Promise<CircleChannelsResponse> {
+    const response = await privateApi.get(`/api/p/v1/circles/${encodeURIComponent(circleId)}/channels`);
+    if (!Array.isArray(response.data?.categories) || !Array.isArray(response.data?.channels)) {
+        throw new Error('Invalid circle channels response');
+    }
+    return {
+        categories: response.data.categories,
+        channels: response.data.channels,
+    };
+}
+
+export async function getCircleChannelMessages(
+    circleId: string,
+    channelId: string,
+    { limit = 50, before, before_id }: CircleChannelMessagesOptions = {},
+): Promise<CircleChannelMessagesResponse> {
+    const response = await privateApi.get(
+        `/api/p/v1/circles/${encodeURIComponent(circleId)}/channels/${encodeURIComponent(channelId)}/messages`,
+        { params: { limit, ...(before ? { before } : {}), ...(before_id ? { before_id } : {}) } },
+    );
+    if (!Array.isArray(response.data?.messages)) {
+        throw new Error('Invalid circle channel messages response');
+    }
+    if (response.data.has_more && (!response.data.next_before || !response.data.next_before_id)) {
+        throw new Error('Circle channel history response is missing its pagination cursor');
+    }
+    return {
+        messages: response.data.messages,
+        has_more: Boolean(response.data.has_more),
+        next_before: response.data.next_before ?? null,
+        next_before_id: response.data.next_before_id ?? null,
+    };
 }
 
 export async function getCircle(circleId: string): Promise<CircleDetails> {
@@ -123,6 +211,62 @@ export async function deleteCircle(circleId: string): Promise<void> {
     await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}`);
 }
 
+// Bit flags for CircleRole.permissions, mirroring the backend constants.
+export const CirclePermission = {
+    ViewChannels: 1 << 0,
+    SendMessages: 1 << 1,
+    ReadHistory: 1 << 2,
+    AttachFiles: 1 << 3,
+    ManageMessages: 1 << 4,
+    ManageNicknames: 1 << 5,
+    KickMembers: 1 << 6,
+    BanMembers: 1 << 7,
+    ManageChannels: 1 << 8,
+    ManageRoles: 1 << 9,
+    ManageCircle: 1 << 10,
+    CreateInvites: 1 << 11,
+    Administrator: 1 << 30,
+} as const;
+
+export const DEFAULT_EVERYONE_PERMISSIONS =
+    CirclePermission.ViewChannels | CirclePermission.SendMessages | CirclePermission.ReadHistory |
+    CirclePermission.AttachFiles | CirclePermission.CreateInvites;
+
+// Administrator implies every other permission.
+export const hasCirclePermission = (permissions: number, permission: number) =>
+    (permissions & CirclePermission.Administrator) !== 0 || (permissions & permission) === permission;
+
+export type CircleRole = {
+    id: string;
+    name: string;
+    color?: string | null;
+    icon_url?: string | null;
+    permissions: number;
+    position: number;
+    is_default: boolean;
+    is_mentionable: boolean;
+    created_at: string;
+};
+
+export type CircleRoleInput = {
+    name: string;
+    color?: string;
+    icon_url?: string;
+    permissions?: number;
+    is_mentionable?: boolean;
+};
+
+// Admin-only for now.
+export async function getCircleRoles(circleId: string): Promise<CircleRole[]> {
+    const response = await privateApi.get(`/api/p/v1/circles/${encodeURIComponent(circleId)}/roles`);
+    return Array.isArray(response.data?.roles) ? response.data.roles : [];
+}
+
+// Admin-only for now.
+export async function createCircleRole(circleId: string, role: CircleRoleInput): Promise<void> {
+    await privateApi.post(`/api/p/v1/circles/${encodeURIComponent(circleId)}/roles`, role);
+}
+
 export async function leaveCircle(circleId: string): Promise<void> {
     await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/@me`);
 }
@@ -130,6 +274,39 @@ export async function leaveCircle(circleId: string): Promise<void> {
 // Owner-only.
 export async function kickCircleMember(circleId: string, userId: string): Promise<void> {
     await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(userId)}`);
+}
+
+export type CircleBan = {
+    user_id: string;
+    username: string;
+    display_name?: string | null;
+    reason?: string | null;
+    banned_at?: string;
+    banned_by?: string;
+};
+
+export type CircleBansPage = {
+    bans: CircleBan[];
+    page: number;
+    limit: number;
+};
+
+export async function getCircleBans(circleId: string, page = 1, limit = 50): Promise<CircleBansPage> {
+    const response = await privateApi.get(`/api/p/v1/circles/${encodeURIComponent(circleId)}/bans`, { params: { page, limit } });
+    const data = response.data ?? {};
+    return {
+        bans: Array.isArray(data.bans) ? data.bans : [],
+        page: Number(data.page) || page,
+        limit: Number(data.limit) || limit,
+    };
+}
+
+export async function banCircleMember(circleId: string, userId: string, reason: string): Promise<void> {
+    await privateApi.put(`/api/p/v1/circles/${encodeURIComponent(circleId)}/bans/${encodeURIComponent(userId)}`, { reason });
+}
+
+export async function unbanCircleMember(circleId: string, userId: string): Promise<void> {
+    await privateApi.delete(`/api/p/v1/circles/${encodeURIComponent(circleId)}/bans/${encodeURIComponent(userId)}`);
 }
 
 export async function createCircle(name: string): Promise<void> {

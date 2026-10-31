@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/useTheme';
@@ -28,6 +28,10 @@ type ChatViewProps = {
     loading?: boolean;
     error?: string | null;
     onRetry?: () => void;
+    hasOlderMessages?: boolean;
+    loadingOlderMessages?: boolean;
+    olderMessagesError?: string | null;
+    onLoadOlderMessages?: () => void;
     emptyTitle: string;
     emptyCopy: string;
     composer: Omit<ComposerProps, 'wide'>;
@@ -36,9 +40,17 @@ type ChatViewProps = {
 export default function ChatView({
     wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels, onPressAvatar,
     loading = false, error = null, onRetry, emptyTitle, emptyCopy, composer,
+    hasOlderMessages = false, loadingOlderMessages = false, olderMessagesError, onLoadOlderMessages,
 }: ChatViewProps) {
     const colors = useTheme();
+    const historyScrollArmed = useRef(false);
     const renderMessage = useCallback(({ item }: { item: Message }) => <MessageItem message={item} onPressAvatar={onPressAvatar} />, [onPressAvatar]);
+    const handleEndReached = useCallback(() => {
+        if (historyScrollArmed.current && hasOlderMessages && !loadingOlderMessages) {
+            historyScrollArmed.current = false;
+            onLoadOlderMessages?.();
+        }
+    }, [hasOlderMessages, loadingOlderMessages, onLoadOlderMessages]);
     const styles = useMemo(() => createStyles(colors, wide), [colors, wide]);
     const newestFirst = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -52,6 +64,21 @@ export default function ChatView({
                 </View>
             )
             : <View style={styles.empty}><Text style={styles.emptyTitle}>{emptyTitle}</Text><Text style={styles.emptyCopy}>{emptyCopy}</Text></View>;
+    const olderMessagesControl = hasOlderMessages || loadingOlderMessages || olderMessagesError
+        ? (
+            <View style={styles.olderMessages}>
+                {loadingOlderMessages ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                {olderMessagesError ? <Text style={styles.stateText}>{olderMessagesError}</Text> : null}
+                {!loadingOlderMessages && onLoadOlderMessages ? (
+                    <Pressable onPress={onLoadOlderMessages} accessibilityRole="button" disabled={!hasOlderMessages}>
+                        <Text style={[styles.retryText, !hasOlderMessages && styles.hiddenText]}>
+                            {olderMessagesError ? 'Try loading older messages again' : 'Load older messages'}
+                        </Text>
+                    </Pressable>
+                ) : null}
+            </View>
+        )
+        : null;
 
     return (
         <View style={styles.pane}>
@@ -72,7 +99,11 @@ export default function ChatView({
                 maintainVisibleContentPosition={MESSAGE_LIST_ANCHORING}
                 keyExtractor={keyExtractor}
                 renderItem={renderMessage}
+                onScrollBeginDrag={() => { historyScrollArmed.current = true; }}
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.25}
                 contentContainerStyle={styles.list}
+                ListFooterComponent={olderMessagesControl}
                 ListEmptyComponent={emptyState}
             />
             <Composer wide={wide} {...composer} />
@@ -95,4 +126,6 @@ const createStyles = (colors: ThemeColors, wide: boolean) => StyleSheet.create({
     stateBlock: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
     stateText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
     retryText: { color: colors.accent, fontSize: 13, fontWeight: '700', marginTop: 10 },
+    olderMessages: { minHeight: 34, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+    hiddenText: { opacity: 0 },
 });

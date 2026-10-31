@@ -21,6 +21,9 @@ import { useCUserStore } from '../services/storage/store/cUserStore';
 import { Conversation, ConversationMessage, getConversationMessages, getConversations } from '../services/api/messages/conversations';
 import {
     Circle,
+    CircleChannel,
+    CircleChannelCategory,
+    CircleChannelMessage,
     CircleFolder,
     CircleLayoutItem,
     buildCircleLayout,
@@ -29,6 +32,8 @@ import {
     deleteCircle,
     deleteCircleFolder,
     getCircleFolders,
+    getCircleChannels,
+    getCircleChannelMessages,
     getCircles,
     moveCircleToFolder,
     renameCircleFolder,
@@ -36,8 +41,8 @@ import {
 } from '../services/api/messages/circles';
 import { Message, formatMessageTime, getConversationInitials, mapConversationMessage } from '../services/messages/messageMapping';
 import { useMessagesSocket } from '../services/messages/useMessagesSocket';
-import { INITIAL_CHAT_STATE, SERVERS, Server } from '../data/circles';
-import ChannelRow from '../components/messages/ChannelRow';
+import { SERVERS, Server } from '../data/circles';
+import CircleChannelList from '../components/messages/CircleChannelList';
 import ChatView from '../components/messages/ChatView';
 import CircleDrawer from '../components/messages/CircleDrawer';
 import CircleHeader from '../components/messages/CircleHeader';
@@ -54,6 +59,18 @@ import { useCircleDrawer } from '../components/messages/useCircleDrawer';
 
 type MessagesScreenProps = { onOpenSidebar: () => void };
 
+function mapCircleChannelMessage(message: CircleChannelMessage, currentUserId: string): Message {
+    const senderName = message.sender.nickname || message.sender.display_name || message.sender.username || 'Unknown member';
+    const own = Boolean(currentUserId) && message.sender.user_id === currentUserId;
+    return {
+        id: message.id,
+        author: own ? 'You' : senderName,
+        body: message.is_deleted ? 'This message was deleted.' : message.content,
+        time: formatMessageTime(message.created_at),
+        own,
+    };
+}
+
 export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const colors = useTheme();
     const { width } = useWindowDimensions();
@@ -67,6 +84,20 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const [serverId, setServerId] = useState('');
     const [roomId, setRoomId] = useState('');
     const [circles, setCircles] = useState<Circle[]>([]);
+    const [channelDataByCircle, setChannelDataByCircle] = useState<Record<string, { categories: CircleChannelCategory[]; channels: CircleChannel[] }>>({});
+    const [channelsLoading, setChannelsLoading] = useState(false);
+    const [channelsError, setChannelsError] = useState<string | null>(null);
+    const [channelMessagesById, setChannelMessagesById] = useState<Record<string, Message[]>>({});
+    const [channelHistoryById, setChannelHistoryById] = useState<Record<string, {
+        hasMore: boolean;
+        nextBefore: string | null;
+        nextBeforeId: string | null;
+    }>>({});
+    const [circleMessagesLoading, setCircleMessagesLoading] = useState(false);
+    const [circleMessagesError, setCircleMessagesError] = useState<string | null>(null);
+    const [loadingOlderChannelId, setLoadingOlderChannelId] = useState<string | null>(null);
+    const [olderMessagesError, setOlderMessagesError] = useState<string | null>(null);
+    const loadingOlderChannelsRef = useRef(new Set<string>());
     const [circleFolders, setCircleFolders] = useState<CircleFolder[]>([]);
     const [circlesLoading, setCirclesLoading] = useState(true);
     const [circlesError, setCirclesError] = useState<string | null>(null);
@@ -82,7 +113,6 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const [directChatOpen, setDirectChatOpen] = useState(false);
     const [modeChangeDirection, setModeChangeDirection] = useState<'toDirect' | 'toCircles' | null>(null);
     const [draft, setDraft] = useState('');
-    const [chats, setChats] = useState(INITIAL_CHAT_STATE);
     const conversationsRef = useRef(conversations);
     conversationsRef.current = conversations;
     const messageListRef = useRef<FlatList<Message> | null>(null);
@@ -127,7 +157,22 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
         refreshConversations();
     }, [refreshConversations]);
 
-    const handleIncomingMessage = (incoming: ConversationMessage) => {
+    const handleIncomingMessage = (incoming: ConversationMessage | CircleChannelMessage) => {
+        if ('channel_id' in incoming) {
+            const mappedMessage = mapCircleChannelMessage(incoming, currentUserId);
+            setChannelMessagesById(previous => {
+                const existing = previous[incoming.channel_id] ?? [];
+                if (existing.some(message => message.id === mappedMessage.id)) return previous;
+                const optimisticIndex = mappedMessage.own
+                    ? existing.findIndex(message => message.id.startsWith('pending-') && message.body === mappedMessage.body)
+                    : -1;
+                const nextMessages = [...existing];
+                if (optimisticIndex >= 0) nextMessages.splice(optimisticIndex, 1, mappedMessage);
+                else nextMessages.push(mappedMessage);
+                return { ...previous, [incoming.channel_id]: nextMessages };
+            });
+            return;
+        }
         const conversation = conversationsRef.current.find(item => item.id === incoming.conversation_id);
         const mappedMessage = mapConversationMessage(incoming, conversation, currentUserId);
         setDirectMessages(previous => {
@@ -154,7 +199,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
             }
             : item));
     };
-    const { socketRef, status: socketStatus, reconnect: reconnectSocket } = useMessagesSocket(mode === 'direct', handleIncomingMessage);
+    const { socketRef, status: socketStatus, reconnect: reconnectSocket } = useMessagesSocket(true, handleIncomingMessage);
 
     const loadConversationMessages = useCallback(async (conversationId: string, isCurrent: () => boolean = () => true) => {
         setMessagesLoading(true);
@@ -189,6 +234,29 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
         return () => { isCurrent = false; };
     }, [activeConversationId, loadConversationMessages, mode]);
 
+    const loadCircleChannels = useCallback(async (circleId: string, isCurrent: () => boolean = () => true) => {
+        setChannelsLoading(true);
+        setChannelsError(null);
+        try {
+            const response = await getCircleChannels(circleId);
+            if (isCurrent()) {
+                setChannelDataByCircle(previous => ({ ...previous, [circleId]: response }));
+            }
+        } catch (error) {
+            console.warn('Could not load circle channels', error);
+            if (isCurrent()) setChannelsError('We couldn’t load this circle’s channels. Check your connection and try again.');
+        } finally {
+            if (isCurrent()) setChannelsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (mode !== 'servers' || !serverId || channelDataByCircle[serverId]) return;
+        let isCurrent = true;
+        loadCircleChannels(serverId, () => isCurrent);
+        return () => { isCurrent = false; };
+    }, [channelDataByCircle, loadCircleChannels, mode, serverId]);
+
     const servers = useMemo(() => {
         const circleById = new Map(circles.map(circle => [circle.id, circle]));
         const orderedCircles = buildCircleLayout(circles, circleFolders).reduce<Circle[]>((ordered, item) => {
@@ -208,10 +276,16 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 id: circle.id,
                 name: circle.name,
                 initials: circle.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? '').join('') || '?',
+                rooms: (channelDataByCircle[circle.id]?.channels ?? []).map(channel => ({
+                    id: channel.id,
+                    name: channel.name,
+                    messages: [],
+                    categoryId: channel.category_id,
+                })),
                 folderId: circle.folder_id,
             };
         });
-    }, [circleFolders, circles]);
+    }, [channelDataByCircle, circleFolders, circles]);
     useEffect(() => {
         if (!servers.length) {
             setServerId('');
@@ -229,6 +303,91 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
 
     const server = servers.find(item => item.id === serverId) ?? servers[0] ?? null;
     const room = server?.rooms.find(item => item.id === roomId) ?? server?.rooms[0] ?? null;
+    const selectedChannelData = server ? channelDataByCircle[server.id] : undefined;
+    const loadCircleChannelMessages = useCallback(async (
+        circleId: string,
+        channelId: string,
+        isCurrent: () => boolean = () => true,
+    ) => {
+        setCircleMessagesLoading(true);
+        setCircleMessagesError(null);
+        try {
+            const response = await getCircleChannelMessages(circleId, channelId);
+            const mappedMessages = [...response.messages]
+                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                .map(message => mapCircleChannelMessage(message, currentUserId));
+            if (isCurrent()) {
+                setChannelMessagesById(previous => {
+                    const receivedWhileLoading = previous[channelId] ?? [];
+                    const uniqueMessages = new Map<string, Message>();
+                    [...mappedMessages, ...receivedWhileLoading].forEach(message => uniqueMessages.set(message.id, message));
+                    return { ...previous, [channelId]: [...uniqueMessages.values()] };
+                });
+                setChannelHistoryById(previous => ({
+                    ...previous,
+                    [channelId]: {
+                        hasMore: response.has_more,
+                        nextBefore: response.next_before,
+                        nextBeforeId: response.next_before_id,
+                    },
+                }));
+            }
+        } catch (error) {
+            console.warn('Could not load circle channel messages', error);
+            if (isCurrent()) setCircleMessagesError('We couldn’t load messages in this channel. Check your connection and try again.');
+        } finally {
+            if (isCurrent()) setCircleMessagesLoading(false);
+        }
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (mode !== 'servers' || !server?.id || !room?.id || room.id !== roomId) return;
+        if (channelHistoryById[room.id]) return;
+        let isCurrent = true;
+        loadCircleChannelMessages(server.id, room.id, () => isCurrent);
+        return () => { isCurrent = false; };
+    }, [channelHistoryById, loadCircleChannelMessages, mode, room?.id, roomId, server?.id]);
+
+    const loadOlderCircleMessages = useCallback(async () => {
+        if (!server || !room || loadingOlderChannelsRef.current.has(room.id)) return;
+        const history = channelHistoryById[room.id];
+        if (!history?.hasMore || !history.nextBefore || !history.nextBeforeId) return;
+
+        loadingOlderChannelsRef.current.add(room.id);
+        setLoadingOlderChannelId(room.id);
+        setOlderMessagesError(null);
+        try {
+            const response = await getCircleChannelMessages(server.id, room.id, {
+                limit: 50,
+                before: history.nextBefore,
+                before_id: history.nextBeforeId,
+            });
+            const olderMessages = [...response.messages]
+                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                .map(message => mapCircleChannelMessage(message, currentUserId));
+            setChannelMessagesById(previous => {
+                const existing = previous[room.id] ?? [];
+                const combined = new Map<string, Message>();
+                [...olderMessages, ...existing].forEach(message => combined.set(message.id, message));
+                return { ...previous, [room.id]: [...combined.values()] };
+            });
+            setChannelHistoryById(previous => ({
+                ...previous,
+                [room.id]: {
+                    hasMore: response.has_more,
+                    nextBefore: response.next_before,
+                    nextBeforeId: response.next_before_id,
+                },
+            }));
+        } catch (error) {
+            console.warn('Could not load older circle messages', error);
+            setOlderMessagesError('Could not load older messages.');
+        } finally {
+            loadingOlderChannelsRef.current.delete(room.id);
+            setLoadingOlderChannelId(current => current === room.id ? null : current);
+        }
+    }, [channelHistoryById, currentUserId, room, server]);
+
     const { details: circleDetails, save: saveCircleDetails } = useCircleDetails(server?.id ?? '');
     const [circleEditOpen, setCircleEditOpen] = useState(false);
     const [circleMembersOpen, setCircleMembersOpen] = useState(false);
@@ -249,8 +408,9 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const activeConversation = conversations.find(item => item.id === activeConversationId) ?? null;
     const activeChatId = room?.id ?? '';
     const activeMessages = mode === 'servers'
-        ? chats[activeChatId] ?? []
+        ? channelMessagesById[activeChatId] ?? []
         : activeConversationId ? directMessages[activeConversationId] ?? [] : [];
+    const activeChannelHistory = mode === 'servers' ? channelHistoryById[activeChatId] : undefined;
     const directName = activeConversation?.participant.display_name || activeConversation?.participant.username || 'Direct message';
 
     const inMobileDirectChat = !wide && mode === 'direct' && directChatOpen;
@@ -430,6 +590,35 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const sendMessage = () => {
         const body = draft.trim();
         if (!body) return;
+        if (mode === 'servers') {
+            const socket = socketRef.current;
+            if (!activeChatId || !socket || socket.readyState !== WebSocket.OPEN) return;
+            const createdAt = new Date().toISOString();
+            const optimisticMessage: Message = {
+                id: `pending-${Date.now()}`,
+                author: 'You',
+                body,
+                time: formatMessageTime(createdAt),
+                own: true,
+            };
+            try {
+                socket.send(JSON.stringify({
+                    event: 'message.send',
+                    data: { channel_id: activeChatId, content: body },
+                }));
+                setChannelMessagesById(previous => ({
+                    ...previous,
+                    [activeChatId]: [...(previous[activeChatId] ?? []), optimisticMessage],
+                }));
+                setDraft('');
+                setCircleMessagesError(null);
+                scrollToLatest();
+            } catch (error) {
+                console.warn('Could not send circle channel message', error);
+                setCircleMessagesError('Your message couldn’t be sent. Please try again.');
+            }
+            return;
+        }
         if (mode === 'direct') {
             const socket = socketRef.current;
             if (!activeConversationId || !socket || socket.readyState !== WebSocket.OPEN) return;
@@ -471,16 +660,6 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
             }
             return;
         }
-        const message: Message = {
-            id: `${Date.now()}`,
-            author: 'You',
-            body,
-            time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-            own: true,
-        };
-        setChats(previous => ({ ...previous, [activeChatId]: [...(previous[activeChatId] ?? []), message] }));
-        setDraft('');
-        scrollToLatest();
     };
 
     const openProfile = useCallback((message: Message) => {
@@ -498,12 +677,19 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 title={direct ? (activeConversation ? directName : 'Select a conversation') : room?.name ?? 'Choose a circle'}
                 subtitle={direct ? activeConversation?.participant.username ?? '' : server && room ? `${server.name} · ${room.name}` : ''}
                 leading={direct ? (activeConversation ? { initials: getConversationInitials(activeConversation) } : undefined) : room ? 'hash' : undefined}
-                loading={direct && messagesLoading}
-                error={direct ? messagesError : null}
-                onRetry={() => { if (activeConversationId) loadConversationMessages(activeConversationId); }}
+                loading={direct ? messagesLoading : circleMessagesLoading}
+                error={direct ? messagesError : circleMessagesError}
+                hasOlderMessages={!direct && Boolean(activeChannelHistory?.hasMore)}
+                loadingOlderMessages={!direct && loadingOlderChannelId === activeChatId}
+                olderMessagesError={!direct && loadingOlderChannelId !== activeChatId ? olderMessagesError : null}
+                onLoadOlderMessages={direct ? undefined : loadOlderCircleMessages}
+                onRetry={() => {
+                    if (direct && activeConversationId) loadConversationMessages(activeConversationId);
+                    else if (server && room) loadCircleChannelMessages(server.id, room.id);
+                }}
                 emptyTitle={!direct ? (server ? 'A fresh start' : 'No circles yet') : activeConversationId ? 'No messages yet' : 'Choose a conversation'}
                 emptyCopy={!direct
-                    ? server ? 'Say hello and get the conversation going.' : 'Create a circle to get started.'
+                    ? server ? 'Messages in this channel will appear here.' : 'Create a circle to get started.'
                     : activeConversationId
                         ? 'Messages in this conversation will appear here.'
                         : 'Select someone from your direct message history to open the chat.'}
@@ -511,9 +697,11 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     value: draft,
                     onChangeText: setDraft,
                     onSend: sendMessage,
-                    placeholder: !direct ? room ? `Message #${room.name}` : 'Create a circle to start chatting' : activeConversation ? `Message ${directName}` : 'Choose a conversation',
+                    placeholder: direct
+                        ? activeConversation ? `Message ${directName}` : 'Choose a conversation'
+                        : room ? `Message #${room.name}` : 'Select a channel',
                     disabled: direct ? !activeConversationId : !room,
-                    connection: direct ? { status: socketStatus, onReconnect: reconnectSocket } : undefined,
+                    connection: { status: socketStatus, onReconnect: reconnectSocket },
                 }}
                 {...handlers}
                 onPressAvatar={direct ? undefined : openProfile}
@@ -566,9 +754,17 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     </Pressable>
                 ) : null}
                 {circleHeaderNode}
-                {server?.rooms.map(item => (
-                    <ChannelRow key={item.id} name={item.name} active={room?.id === item.id} unread={item.id === 'general' && server.id === servers[0]?.id} onPress={() => setRoomId(item.id)} />
-                ))}
+                {server ? (
+                    <CircleChannelList
+                        categories={selectedChannelData?.categories ?? []}
+                        channels={selectedChannelData?.channels ?? []}
+                        selectedChannelId={room?.id ?? ''}
+                        loading={channelsLoading}
+                        error={channelsError}
+                        onRetry={() => loadCircleChannels(server.id)}
+                        onSelect={setRoomId}
+                    />
+                ) : null}
                 {!circlesLoading && !circlesError && !server ? <Text style={styles.listStatus}>No circles yet. Use the + button to create one.</Text> : null}
             </> : <>
                 <View style={styles.listHeadingRow}><Text style={styles.listHeading}>DIRECT MESSAGES</Text></View>
@@ -668,6 +864,11 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                                     circleHeader={drawerHeaderNode}
                                     memberCount={circleDetails?.member_count}
                                     onOpenMembers={() => setCircleMembersOpen(true)}
+                                    categories={selectedChannelData?.categories ?? []}
+                                    channels={selectedChannelData?.channels ?? []}
+                                    channelsLoading={channelsLoading}
+                                    channelsError={channelsError}
+                                    onRetryChannels={() => { if (server) loadCircleChannels(server.id); }}
                                 />
                             ) : null}
                         </>}

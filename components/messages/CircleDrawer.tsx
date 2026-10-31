@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/useTheme';
 import { ThemeColors } from '../../theme/colors';
 import { Server } from '../../data/circles';
-import { Circle, CircleFolder } from '../../services/api/messages/circles';
-import ChannelRow from './ChannelRow';
+import { Circle, CircleChannel, CircleChannelCategory, CircleFolder } from '../../services/api/messages/circles';
+import CircleChannelList from './CircleChannelList';
 import CircleRail, { CircleDragEntity, CircleDropTarget } from './CircleRail';
 import { CIRCLE_DRAWER_WIDTH, CircleDrawerController } from './useCircleDrawer';
 
@@ -31,11 +31,17 @@ type CircleDrawerProps = {
     circleHeader?: React.ReactNode;
     memberCount?: number;
     onOpenMembers?: () => void;
+    categories: CircleChannelCategory[];
+    channels: CircleChannel[];
+    channelsLoading: boolean;
+    channelsError: string | null;
+    onRetryChannels: () => void;
 };
 
 export default function CircleDrawer({
     drawer, circles, servers, server, roomId, folders, loading, error, onRetry, onCreateCircle, onManageFolders, onDropCircle, onReorder,
     onChooseServer, onChooseRoom, onOpenDirect, circleHeader, memberCount, onOpenMembers,
+    categories, channels, channelsLoading, channelsError, onRetryChannels,
 }: CircleDrawerProps) {
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
@@ -82,11 +88,15 @@ export default function CircleDrawer({
                             {circleHeader}
                             {server ? <>
                                 <Text style={styles.sectionLabel}>CHANNELS</Text>
-                                <ScrollView showsVerticalScrollIndicator={false}>
-                                    {server.rooms.map(item => (
-                                        <ChannelRow key={item.id} name={item.name} active={roomId === item.id} unread={item.id === 'general' && server.id === servers[0]?.id} onPress={() => onChooseRoom(item.id)} />
-                                    ))}
-                                </ScrollView>
+                                <CircleChannelList
+                                    categories={categories}
+                                    channels={channels}
+                                    selectedChannelId={server.rooms.some(channel => channel.id === roomId) ? roomId : server.rooms[0]?.id ?? ''}
+                                    loading={channelsLoading}
+                                    error={channelsError}
+                                    onRetry={onRetryChannels}
+                                    onSelect={onChooseRoom}
+                                />
                             </> : (
                                 <View style={styles.emptyState}>
                                     <Text style={styles.emptyText}>{error ?? (loading ? 'Loading circles…' : 'Create a circle to get started.')}</Text>

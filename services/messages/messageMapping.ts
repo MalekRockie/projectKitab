@@ -1,4 +1,5 @@
 import { Conversation, ConversationMessage } from '../api/messages/conversations';
+import { CircleChannelMessage } from '../api/messages/circles';
 
 export type Message = { id: string; author: string; body: string; time: string; own?: boolean };
 
@@ -48,6 +49,58 @@ export function findIncomingMessage(frame: unknown): ConversationMessage | null 
                 is_edited: Boolean(value.is_edited ?? value.edited),
                 created_at: String(value.created_at ?? value.createdAt ?? new Date().toISOString()),
             };
+        }
+
+        Object.values(value).forEach(child => {
+            if (child && typeof child === 'object') pending.push(child);
+        });
+    }
+
+    return null;
+}
+
+export function findIncomingCircleChannelMessage(frame: unknown): CircleChannelMessage | null {
+    const pending = [frame];
+    const seen = new Set<object>();
+
+    while (pending.length > 0) {
+        const candidate = pending.shift();
+        if (!candidate || typeof candidate !== 'object' || seen.has(candidate)) continue;
+        seen.add(candidate);
+
+        const value = candidate as Record<string, unknown>;
+        const id = value.id ?? value.message_id;
+        const channelId = value.channel_id ?? value.channelId;
+        const sender = value.sender;
+        const content = value.content;
+        if (
+            id
+            && channelId
+            && sender
+            && typeof sender === 'object'
+            && typeof content === 'string'
+        ) {
+            const senderValue = sender as Record<string, unknown>;
+            const userId = senderValue.user_id ?? senderValue.userId;
+            if (userId) {
+                return {
+                    id: String(id),
+                    channel_id: String(channelId),
+                    sender: {
+                        user_id: String(userId),
+                        username: String(senderValue.username ?? 'Unknown member'),
+                        display_name: typeof senderValue.display_name === 'string' ? senderValue.display_name : null,
+                        nickname: typeof senderValue.nickname === 'string' ? senderValue.nickname : null,
+                        avatar_url: typeof senderValue.avatar_url === 'string' ? senderValue.avatar_url : null,
+                        is_member: Boolean(senderValue.is_member),
+                    },
+                    content,
+                    is_deleted: Boolean(value.is_deleted ?? value.deleted),
+                    is_edited: Boolean(value.is_edited ?? value.edited),
+                    is_pinned: Boolean(value.is_pinned ?? value.pinned),
+                    created_at: String(value.created_at ?? value.createdAt ?? new Date().toISOString()),
+                };
+            }
         }
 
         Object.values(value).forEach(child => {
