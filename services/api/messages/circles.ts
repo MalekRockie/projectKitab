@@ -202,6 +202,24 @@ export async function getCircleMembers(circleId: string, page = 1, limit = 50): 
     };
 }
 
+export type CircleMemberProfile = {
+    user_id: string;
+    name?: string | null;
+    nickname?: string | null;
+    username: string;
+    display_name?: string | null;
+    avatar_url?: string | null;
+    bio?: string | null;
+    joined_at: string;
+    is_owner: boolean;
+    roles: unknown[];
+};
+
+export async function getCircleMemberProfile(circleId: string, userId: string): Promise<CircleMemberProfile> {
+    const response = await privateApi.get(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(userId)}`);
+    return response.data.member;
+}
+
 // Pass '@me' as userId to change your own nickname.
 export async function updateCircleMemberNickname(circleId: string, userId: string, nickname: string): Promise<void> {
     await privateApi.patch(`/api/p/v1/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(userId)}`, { nickname });

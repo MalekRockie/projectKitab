@@ -1,7 +1,7 @@
 import { Conversation, ConversationMessage } from '../api/messages/conversations';
 import { CircleChannelMessage } from '../api/messages/circles';
 
-export type Message = { id: string; author: string; body: string; time: string; own?: boolean };
+export type Message = { id: string; author: string; body: string; time: string; own?: boolean; senderId?: string };
 
 export const getConversationName = (conversation: Conversation) =>
     conversation.participant.display_name || conversation.participant.username || 'Unknown person';

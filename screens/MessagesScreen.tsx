@@ -34,6 +34,7 @@ import {
     getCircleFolders,
     getCircleChannels,
     getCircleChannelMessages,
+    getCircleMemberProfile,
     getCircles,
     moveCircleToFolder,
     renameCircleFolder,
@@ -48,7 +49,7 @@ import CircleDrawer from '../components/messages/CircleDrawer';
 import CircleHeader from '../components/messages/CircleHeader';
 import CircleEditDialog from '../components/messages/CircleEditDialog';
 import CircleProfileSheet from '../components/messages/CircleProfileSheet';
-import { CircleProfile, buildPlaceholderProfile } from '../components/messages/circleProfile';
+import { CircleProfile, applyMemberProfile, buildPlaceholderProfile } from '../components/messages/circleProfile';
 import CircleMembersDialog from '../components/messages/CircleMembersDialog';
 import useCircleDetails from '../components/messages/useCircleDetails';
 import CircleManager from '../components/messages/CircleManager';
@@ -68,6 +69,7 @@ function mapCircleChannelMessage(message: CircleChannelMessage, currentUserId: s
         body: message.is_deleted ? 'This message was deleted.' : message.content,
         time: formatMessageTime(message.created_at),
         own,
+        senderId: message.sender.user_id,
     };
 }
 
@@ -663,8 +665,17 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     };
 
     const openProfile = useCallback((message: Message) => {
-        setProfile(buildPlaceholderProfile(message, { displayName: currentDisplayName, username: currentUsername }));
-    }, [currentDisplayName, currentUsername]);
+        const base = buildPlaceholderProfile(message, { displayName: currentDisplayName, username: currentUsername });
+        setProfile(base);
+        const userId = message.senderId || (message.own ? currentUserId : '');
+        if (!serverId || !userId) {
+            setProfile(current => (current === base ? { ...base, loading: false } : current));
+            return;
+        }
+        getCircleMemberProfile(serverId, userId)
+            .then(member => setProfile(current => (current === base ? applyMemberProfile(base, member) : current)))
+            .catch(() => setProfile(current => (current === base ? { ...base, loading: false } : current)));
+    }, [currentDisplayName, currentUsername, currentUserId, serverId]);
 
     const renderChat = (handlers: { onBack?: () => void; onOpenChannels?: () => void } = {}) => {
         const direct = mode === 'direct';

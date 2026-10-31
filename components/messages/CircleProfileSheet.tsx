@@ -85,6 +85,17 @@ export default function CircleProfileSheet({ profile, circleName, onClose, onEdi
                     <View style={styles.profileInfo}>
                         <Text style={styles.name}>{profile.name}</Text>
                         <Text style={styles.username}>@{profile.username}</Text>
+                        {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+                        {profile.roles?.length ? (
+                            <View style={styles.roles}>
+                                {profile.roles.map(role => (
+                                    <View key={role} style={[styles.roleChip, role === 'Admin' && styles.adminChip]}>
+                                        {/* {role === 'Admin' ? <Icon name="shield" size={12} color={colors.accent} /> : null} */}
+                                        <Text style={[styles.roleText, role === 'Admin' && { color: colors.accent }]}>{role}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ) : null}
                     </View>
                     {profile.isOwn ? (
                         <Pressable onPress={onEditProfile} style={styles.editButton} accessibilityRole="button">
@@ -131,6 +142,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     profileInfo: { marginTop: 40},
     name: { color: colors.text, fontSize: 24, fontWeight: '800' },
     username: { color: colors.textSecondary, fontSize: 14, marginTop: 2 },
+    bio: { color: colors.text, fontSize: 14, lineHeight: 20, marginTop: 10 },
+    roles: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+    roleChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.surface },
+    adminChip: { backgroundColor: colors.iconBg },
+    roleText: { color: colors.text, fontSize: 12, fontWeight: '700' },
     editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 46, marginTop: 16, borderRadius: 14, backgroundColor: colors.accent },
     editText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
     card: { marginTop: 20, borderRadius: 16, backgroundColor: colors.surface, paddingVertical: 4 },
