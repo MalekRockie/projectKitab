@@ -7,12 +7,14 @@ import { shallow } from 'zustand/shallow';
 import { bookmarkTarget, togglePostLike } from '../../services/api/feed/post/post';
 import { useNavigation } from '@react-navigation/native';
 import GalleryViewer from '../Media/GalleryViewer';
+import MediaGrid from '../Media/MediaGrid';
 import { useTheme } from '../../theme/useTheme';
 import { darkColors } from '../../theme/colors';
 import { openUserProfile } from '../../utils/profileNavigation';
 import EmbeddedPost from './EmbeddedPost';
 import { getPostShareInfo, normalizePostForDetail } from './postSharing';
 import RepostAction from './RepostAction';
+import { getBlockType } from '../../utils/postBlocks';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -215,10 +217,11 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
     const { originalPost, isQuotePost, isPlainRepost, reposter } = getPostShareInfo(post);
     const displayPost = isPlainRepost && originalPost ? normalizePostForDetail(originalPost) : post;
     const displayBlocks = displayPost.postblocks ?? [];
-    const textBlocks = displayBlocks.filter(b => (b.blockType ?? b.block_type) === 'text');
-    const mediaBlocks = displayBlocks.filter(b => (b.blockType ?? b.block_type) === 'image');
+    const textBlocks = displayBlocks.filter(b => getBlockType(b) === 'text');
+    const mediaBlocks = displayBlocks.filter(b => getBlockType(b) === 'image' || getBlockType(b) === 'video');
+    const imageBlocks = mediaBlocks.filter(b => getBlockType(b) === 'image');
     const videoBlocks = displayBlocks.filter(b => (b.blockType ?? b.block_type) === 'video');
-    const layoutMode = displayPost.layout_mode === 'gallery' ? 'gallery' : 'inline';
+    const layoutMode = String(displayPost.layout_mode ?? 'inline').trim().toLowerCase() === 'gallery' ? 'gallery' : 'inline';
     const openOriginalPost = original => {
         navigation.navigate('MainApp', {
             screen: 'PostScreen',
@@ -297,13 +300,13 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                     </View>
 
                     {mediaBlocks.length > 0 && layoutMode === 'gallery' && (
-                        <MediaGallery media={mediaBlocks} onPressItem={openGallery} styles={styles} />
+                        <MediaGrid media={mediaBlocks} onPressItem={openGallery} />
                     )}
 
-                    {mediaBlocks.length > 0 && layoutMode === 'inline' && (
+                    {imageBlocks.length > 0 && layoutMode === 'inline' && (
                         <>
                             <View style={styles.inlineMediaCap}>
-                                <MediaGallery media={mediaBlocks} styles={styles} />
+                                <MediaGallery media={imageBlocks} styles={styles} />
                             </View>
                             <Pressable
                                 android_disableSound={true}
@@ -318,7 +321,7 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                         </>
                     )}
 
-                    {videoBlocks.length > 0 && (
+                    {videoBlocks.length > 0 && layoutMode === 'inline' && (
                         <View style={styles.videoPreview}>
                             <Icon name="play-circle-filled" size={42} color="#fff" />
                             <Text style={styles.videoPreviewText}>

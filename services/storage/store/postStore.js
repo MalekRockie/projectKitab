@@ -26,7 +26,7 @@ const normalizePosts = (postsArray) => {
             isLiked: post.is_liked,
             isBookmarked: post.is_bookmarked ?? false,
             blockIds: postblocks.map(block => block.id),
-            layout_mode: post.layout_mode,
+            layout_mode: String(post.layout_mode ?? 'inline').trim().toLowerCase(),
         };
         
         entities.users[post.user_id] = {
@@ -62,7 +62,7 @@ const enrichPost = (postId, entities) => {
         return null;
     }
 
-    const cacheKey = `${postId}-${post.likesCount}-${post.commentCount}-${post.isLiked}-${post.isBookmarked}-${post.editedAt}`;
+    const cacheKey = `${postId}-${post.likesCount}-${post.commentCount}-${post.isLiked}-${post.isBookmarked}-${post.editedAt}-${post.layout_mode}`;
     if (enrichedPostsCache.has(cacheKey)) {
         return enrichedPostsCache.get(cacheKey);
     }
