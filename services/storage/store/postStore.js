@@ -12,7 +12,10 @@ const normalizePosts = (postsArray) => {
     const postIds = [];
     
     postsArray.forEach(post => {
+        const { postblocks: responseBlocks, ...postData } = post;
+        const postblocks = Array.isArray(responseBlocks) ? responseBlocks : [];
         entities.posts[post.id] = {
+            ...postData,
             id: post.id,
             userId: post.user_id,
             likesCount: post.likes_count,
@@ -22,7 +25,7 @@ const normalizePosts = (postsArray) => {
             editedAt: post.edited_at,
             isLiked: post.is_liked,
             isBookmarked: post.is_bookmarked ?? false,
-            blockIds: post.postblocks.map(block => block.id),
+            blockIds: postblocks.map(block => block.id),
             layout_mode: post.layout_mode,
         };
         
@@ -32,7 +35,7 @@ const normalizePosts = (postsArray) => {
             avatar: post.user_avatar,
         };
         
-        post.postblocks.forEach(block => {
+        postblocks.forEach(block => {
             entities.postblocks[block.id] = {
                 id: block.id,
                 blockType: block.block_type,

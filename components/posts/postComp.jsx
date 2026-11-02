@@ -10,6 +10,9 @@ import GalleryViewer from '../Media/GalleryViewer';
 import { useTheme } from '../../theme/useTheme';
 import { darkColors } from '../../theme/colors';
 import { openUserProfile } from '../../utils/profileNavigation';
+import EmbeddedPost from './EmbeddedPost';
+import { getPostShareInfo, normalizePostForDetail } from './postSharing';
+import RepostAction from './RepostAction';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -185,9 +188,9 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
     };
 
     const toggleExpand = () => setExpanded(!expanded);
-    const handleOpenProfile = (event) => {
+    const handleOpenDisplayProfile = (event, displayPost) => {
         event.stopPropagation();
-        openUserProfile(navigation, post.user?.id ?? post.user?.user_id ?? post.user_id);
+        openUserProfile(navigation, displayPost.user?.id ?? displayPost.user?.user_id ?? displayPost.user_id);
     };
     const handleBookmarkPress = async (event) => {
         if (onRemoveBookmark) {
@@ -209,10 +212,19 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
 
     if (!post) return null;
 
-    const textBlocks = post.postblocks.filter(b => b.blockType === 'text');
-    const mediaBlocks = post.postblocks.filter(b => b.blockType === 'image');
-    const videoBlocks = post.postblocks.filter(b => b.blockType === 'video');
-    const layoutMode = post.layout_mode === 'gallery' ? 'gallery' : 'inline';
+    const { originalPost, isQuotePost, isPlainRepost, reposter } = getPostShareInfo(post);
+    const displayPost = isPlainRepost && originalPost ? normalizePostForDetail(originalPost) : post;
+    const displayBlocks = displayPost.postblocks ?? [];
+    const textBlocks = displayBlocks.filter(b => (b.blockType ?? b.block_type) === 'text');
+    const mediaBlocks = displayBlocks.filter(b => (b.blockType ?? b.block_type) === 'image');
+    const videoBlocks = displayBlocks.filter(b => (b.blockType ?? b.block_type) === 'video');
+    const layoutMode = displayPost.layout_mode === 'gallery' ? 'gallery' : 'inline';
+    const openOriginalPost = original => {
+        navigation.navigate('MainApp', {
+            screen: 'PostScreen',
+            params: { post: normalizePostForDetail(original) },
+        });
+    };
 
     const openGallery = (blockId) => {
         const correctIndex = mediaBlocks.findIndex(b => b.id === blockId);
@@ -254,19 +266,30 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                 style={[styles.container, { backgroundColor: isPressed ? postColors.backgroundPressed : postColors.background }]}
                 onPress={goToPost}
             >
-                <Pressable onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="Open profile">
+                <Pressable
+                    onPress={event => handleOpenDisplayProfile(event, displayPost)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open post author's profile"
+                >
                     <Image
-                        source={post.user_avatar ? { uri: post.user_avatar } : require('../../icons/avatar.png')}
+                        source={displayPost.user_avatar ? { uri: displayPost.user_avatar } : require('../../icons/avatar.png')}
                         style={styles.avatar}
                     />
                 </Pressable>
 
                 <View style={styles.body}>
+                    {isPlainRepost ? (
+                        <View style={styles.repostAttribution}>
+                            <Icon name="repeat" size={15} color={postColors.textSecondary} />
+                            <Text style={styles.repostAttributionText}>{reposter || 'Someone'} reposted</Text>
+                        </View>
+                    ) : null}
+
                     <View style={styles.postHeader}>
-                        <Pressable onPress={handleOpenProfile} accessibilityRole="button">
-                            <Text style={styles.username}>{post.user?.username}</Text>
+                        <Pressable onPress={event => handleOpenDisplayProfile(event, displayPost)} accessibilityRole="button">
+                            <Text style={styles.username}>{displayPost.user?.username}</Text>
                         </Pressable>
-                        <Text style={styles.timestamp}> · {formatRelativeTime(post.createdAt)}</Text>
+                        <Text style={styles.timestamp}> · {formatRelativeTime(displayPost.createdAt)}</Text>
                     </View>
 
                     <View>
@@ -304,6 +327,13 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                         </View>
                     )}
 
+                    {isQuotePost ? (
+                        <EmbeddedPost
+                            post={originalPost}
+                            onPress={openOriginalPost}
+                            accessibilityLabel="Open quoted post"
+                        />
+                    ) : null}
                     <View style={styles.actionBar}>
                         <Pressable
                             android_disableSound={true}
@@ -316,15 +346,11 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                             <Text style={styles.actionText}>{formatCount(post.commentCount)}</Text>
                         </Pressable>
 
-                        <Pressable
-                            android_disableSound={true}
-                            style={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Repost"
-                        >
-                            <Icon name="repeat" size={18} color={postColors.textSecondary} />
-                            <Text style={styles.actionText}>{formatCount(0)}</Text>
-                        </Pressable>
+                        <RepostAction
+                            post={post}
+                            actionStyle={({ pressed }) => [styles.actionButton, { backgroundColor: pressed ? postColors.pillPressed : 'transparent' }]}
+                            textStyle={styles.actionText}
+                        />
 
                         <Pressable
                             android_disableSound={true}
@@ -384,7 +410,7 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                         <GalleryViewer
                             mediaBlocks={mediaBlocks}
                             initialIndex={galleryInitialIndex}
-                            post={post}
+                            post={displayPost}
                             onClose={closeGallery}
                         />
                     </GestureHandlerRootView>
@@ -418,6 +444,17 @@ const createStyles = (c) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'baseline',
         marginBottom: 6,
+    },
+    repostAttribution: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 4,
+    },
+    repostAttributionText: {
+        color: c.textSecondary,
+        fontSize: 12,
+        fontWeight: '600',
     },
     username: {
         fontWeight: '700',

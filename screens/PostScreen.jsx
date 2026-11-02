@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, RefreshControl, Modal } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { GestureHandlerRootView, FlatList } from 'react-native-gesture-handler';
 import { usePStore } from '../services/storage/store/postStore';
@@ -8,6 +9,8 @@ import MediaGrid from '../components/Media/MediaGrid';
 import CommentItem from '../components/posts/CommentItem';
 import PostBlock from '../components/posts/PostBlock';
 import PostDetailActions from '../components/posts/PostDetailActions';
+import EmbeddedPost from '../components/posts/EmbeddedPost';
+import { getPostShareInfo, normalizePostForDetail } from '../components/posts/postSharing';
 import ScreenHeader from '../components/common/ScreenHeader';
 import SortDropdown from '../components/common/SortDropdown';
 import useGalleryViewer from '../hooks/useGalleryViewer';
@@ -24,28 +27,36 @@ export const PostScreen = ({ route }) => {
     const styles = useMemo(() => createStyles(colors), [colors]);
     const updatePost = usePStore(state => state.updatePost);
 
+    const { originalPost, isQuotePost, isPlainRepost, reposter } = getPostShareInfo(post);
+    const displayPost = isPlainRepost && originalPost ? normalizePostForDetail(originalPost) : post;
     // 'gallery' → caption + grid layout. Anything else ('inline', missing,
     // etc.) → blocks render in original authored order, text/media interleaved.
-    const isGalleryMode = post?.layout_mode === 'gallery';
+    const isGalleryMode = displayPost?.layout_mode === 'gallery';
 
     // Guarded against post being undefined — hooks run before the early
     // return below since they can't be called conditionally.
-    const mediaBlocks = useMemo(() => getMediaBlocks(post?.postblocks), [post]);
-    const textBlocks = useMemo(() => getTextBlocks(post?.postblocks), [post]);
+    const mediaBlocks = useMemo(() => getMediaBlocks(displayPost?.postblocks), [displayPost]);
+    const textBlocks = useMemo(() => getTextBlocks(displayPost?.postblocks), [displayPost]);
 
     const gallery = useGalleryViewer(mediaBlocks);
     const { comments, sort, setSort, refreshing, refresh } = usePostComments(post, updatePost);
     const { isLiked, isBookmarked, toggleLike, toggleBookmark } = usePostActions(post, updatePost);
+    const openOriginalPost = useCallback(original => {
+        navigation.navigate('MainApp', {
+            screen: 'PostScreen',
+            params: { post: normalizePostForDetail(original) },
+        });
+    }, [navigation]);
 
     const renderBlock = useCallback((block) => (
         <PostBlock
             key={block.id}
             block={block}
-            post={post}
+            post={displayPost}
             mediaBlocks={mediaBlocks}
             onOpenMedia={gallery.open}
         />
-    ), [post, mediaBlocks, gallery.open]);
+    ), [displayPost, mediaBlocks, gallery.open]);
 
     const renderItem = useCallback(({ item }) => (
         <CommentItem comment={item} post={post} />
@@ -55,7 +66,7 @@ export const PostScreen = ({ route }) => {
 
     return (
         <View style={styles.container}>
-            <ScreenHeader title={`${post.user?.username}'s post`} titleInBackButton />
+            <ScreenHeader title={`${displayPost.user?.username}'s post`} titleInBackButton />
 
             <FlatList
                 style={styles.list}
@@ -75,12 +86,19 @@ export const PostScreen = ({ route }) => {
                 ListHeaderComponent={
                     <>
                         <View style={styles.postContainer}>
+                            {isPlainRepost ? (
+                                <View style={styles.repostAttribution}>
+                                    <Icon name="repeat" size={16} color={colors.textSecondary} />
+                                    <Text style={styles.repostAttributionText}>{reposter} reposted</Text>
+                                </View>
+                            ) : null}
+
                             <View style={styles.postHeader}>
                                 <Image
-                                    source={post.user_avatar ? { uri: post.user_avatar } : require('../icons/avatar.png')}
+                                    source={displayPost.user_avatar ? { uri: displayPost.user_avatar } : require('../icons/avatar.png')}
                                     style={styles.avatar}
                                 />
-                                <Text style={styles.username}>{post.user?.username}</Text>
+                                <Text style={styles.username}>{displayPost.user?.username}</Text>
                             </View>
 
                             {isGalleryMode ? (
@@ -94,15 +112,24 @@ export const PostScreen = ({ route }) => {
                                 </>
                             ) : (
                                 <View style={styles.blocksContainer}>
-                                    {post.postblocks.map(renderBlock)}
+                                    {(displayPost.postblocks ?? []).map(renderBlock)}
                                 </View>
                             )}
 
+                            {isQuotePost ? (
+                                <EmbeddedPost
+                                    post={originalPost}
+                                    onPress={openOriginalPost}
+                                    accessibilityLabel="Open quoted post"
+                                />
+                            ) : null}
+
                             <View style={styles.timestampContainer}>
-                                <Text style={styles.timestamp}>{formatPostTimestamp(post.createdAt)}</Text>
+                                <Text style={styles.timestamp}>{formatPostTimestamp(displayPost.createdAt)}</Text>
                             </View>
 
                             <PostDetailActions
+                                post={post}
                                 commentCount={post.commentCount}
                                 likesCount={post.likesCount}
                                 isLiked={isLiked}
@@ -138,7 +165,7 @@ export const PostScreen = ({ route }) => {
                         <GalleryViewer
                             mediaBlocks={mediaBlocks}
                             initialIndex={gallery.initialIndex}
-                            post={post}
+                            post={displayPost}
                             onClose={gallery.close}
                         />
                     </GestureHandlerRootView>
@@ -170,6 +197,17 @@ const createStyles = (colors) => StyleSheet.create({
         alignItems: 'center',
         marginBottom: 12,
     },
+    repostAttribution: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        marginBottom: 4,
+    },
+    repostAttributionText: {
+        color: colors.textSecondary,
+        fontSize: 13,
+        fontWeight: '600',
+    },
     avatar: {
         width: 40,
         height: 40,
@@ -177,6 +215,7 @@ const createStyles = (colors) => StyleSheet.create({
         marginRight: 10,
         borderWidth: 1,
         borderColor: colors.divider,
+        backgroundColor: colors.avatarBg,
     },
     username: {
         fontWeight: 'bold',

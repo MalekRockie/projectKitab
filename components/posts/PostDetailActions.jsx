@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, Pressable, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/useTheme';
+import RepostAction from './RepostAction';
 
 // Action row shown on the post detail screen: reply, repost, like,
 // bookmark and share, with counts where they apply.
@@ -10,6 +11,7 @@ const PostDetailActions = ({
     likesCount,
     isLiked,
     isBookmarked,
+    post,
     onReply,
     onLike,
     onBookmark,
@@ -29,10 +31,7 @@ const PostDetailActions = ({
                 <Icon name="chat-bubble-outline" size={20} color={colors.textSecondary} />
                 <Text style={styles.actionText}>{commentCount}</Text>
             </Pressable>
-            <TouchableOpacity style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Repost">
-                <Icon name="repeat" size={20} color={colors.textSecondary} />
-                <Text style={styles.actionText}>0</Text>
-            </TouchableOpacity>
+            <RepostAction post={post} iconSize={20} actionStyle={styles.actionButton} textStyle={styles.actionText} />
             <TouchableOpacity
                 style={styles.actionButton}
                 onPress={onLike}

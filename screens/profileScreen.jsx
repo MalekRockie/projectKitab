@@ -41,7 +41,10 @@ export const ProfileScreen = ({ route }) => {
         return () => { isCurrent = false; };
     }, [currentUserId, updateProfile, userId]);
 
-    const isSelf = publicProfile?.is_self === true;
+    const profileUserId = publicProfile?.id ?? publicProfile?.user_id;
+    const isSelf = publicProfile?.is_self === true
+        || (currentUserId && String(profileUserId ?? '') === String(currentUserId))
+        || (!userId && Boolean(currentUserId));
     const shownUsername = publicProfile?.username;
     const shownDisplayName = publicProfile?.display_name;
     const shownProfilePic = publicProfile?.profile_pic;

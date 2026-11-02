@@ -5,6 +5,7 @@ export const lightColors = {
     textSecondary: '#8E8E93',
     accent: '#0066CC',
     iconBg: '#F2F2F7',
+    avatarBg: '#1d1c1c',
     divider: '#C6C6C8',
     chevron: '#C7C7CC',
     danger: '#FF3B30',
@@ -15,11 +16,12 @@ export const lightColors = {
 
 export const darkColors: typeof lightColors = {
     background: '#000000',
-    surface: '#28282e',
+    surface: '#0c0c0c',
     text: '#FFFFFF',
     textSecondary: '#8E8E93',
-    accent: '#70B7FF',
+    accent: '#e9e9e9',
     iconBg: '#2C2C2E',
+    avatarBg: '#ffffff',
     divider: '#4d4d4f',
     chevron: '#48484A',
     danger: '#FF453A',
