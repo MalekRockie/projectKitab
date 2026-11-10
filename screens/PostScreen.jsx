@@ -10,6 +10,7 @@ import CommentItem from '../components/posts/CommentItem';
 import PostBlock from '../components/posts/PostBlock';
 import PostDetailActions from '../components/posts/PostDetailActions';
 import EmbeddedPost from '../components/posts/EmbeddedPost';
+import PostOptionsMenu from '../components/posts/PostOptionsMenu';
 import { getPostShareInfo, normalizePostForDetail } from '../components/posts/postSharing';
 import ScreenHeader from '../components/common/ScreenHeader';
 import SortDropdown from '../components/common/SortDropdown';
@@ -99,6 +100,7 @@ export const PostScreen = ({ route }) => {
                                     style={styles.avatar}
                                 />
                                 <Text style={styles.username}>{displayPost.user?.username}</Text>
+                                <PostOptionsMenu post={displayPost} />
                             </View>
 
                             {isGalleryMode ? (

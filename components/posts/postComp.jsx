@@ -14,6 +14,7 @@ import { openUserProfile } from '../../utils/profileNavigation';
 import EmbeddedPost from './EmbeddedPost';
 import { getPostShareInfo, normalizePostForDetail } from './postSharing';
 import RepostAction from './RepostAction';
+import PostOptionsMenu from './PostOptionsMenu';
 import { getBlockType } from '../../utils/postBlocks';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -289,10 +290,13 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                     ) : null}
 
                     <View style={styles.postHeader}>
-                        <Pressable onPress={event => handleOpenDisplayProfile(event, displayPost)} accessibilityRole="button">
-                            <Text style={styles.username}>{displayPost.user?.username}</Text>
-                        </Pressable>
-                        <Text style={styles.timestamp}> · {formatRelativeTime(displayPost.createdAt)}</Text>
+                        <View style={styles.postHeaderInfo}>
+                            <Pressable onPress={event => handleOpenDisplayProfile(event, displayPost)} accessibilityRole="button">
+                                <Text style={styles.username}>{displayPost.user?.username}</Text>
+                            </Pressable>
+                            <Text style={styles.timestamp}> · {formatRelativeTime(displayPost.createdAt)}</Text>
+                        </View>
+                        <PostOptionsMenu post={displayPost} />
                     </View>
 
                     <View>
@@ -445,8 +449,14 @@ const createStyles = (c) => StyleSheet.create({
     },
     postHeader: {
         flexDirection: 'row',
-        alignItems: 'baseline',
+        alignItems: 'center',
         marginBottom: 6,
+    },
+    postHeaderInfo: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        minWidth: 0,
     },
     repostAttribution: {
         flexDirection: 'row',
