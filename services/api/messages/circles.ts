@@ -45,6 +45,7 @@ export type CircleChannelMessage = {
         is_member: boolean;
     };
     content: string;
+    reply_to_message_id?: string | null;
     is_deleted: boolean;
     is_edited: boolean;
     is_pinned: boolean;

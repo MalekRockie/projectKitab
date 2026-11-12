@@ -1,7 +1,14 @@
 import { Conversation, ConversationMessage } from '../api/messages/conversations';
 import { CircleChannelMessage } from '../api/messages/circles';
 
-export type Message = { id: string; author: string; body: string; time: string; own?: boolean; senderId?: string };
+export type Message = { id: string; author: string; body: string; time: string; own?: boolean; senderId?: string; replyToMessageId?: string | null };
+
+export function createMessageSendEvent(destination: { channel_id: string } | { conversation_id: string }, content: string, replyToMessageId?: string) {
+    return {
+        event: 'message.send',
+        data: { ...destination, content, ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}) },
+    };
+}
 
 export const getConversationName = (conversation: Conversation) =>
     conversation.participant.display_name || conversation.participant.username || 'Unknown person';
@@ -20,6 +27,7 @@ export function mapConversationMessage(message: ConversationMessage, conversatio
         body: message.is_deleted ? 'This message was deleted.' : message.content,
         time: formatMessageTime(message.created_at),
         own,
+        replyToMessageId: message.reply_to_message_id,
     };
 }
 
@@ -45,6 +53,7 @@ export function findIncomingMessage(frame: unknown): ConversationMessage | null 
                 conversation_id: String(conversationId),
                 sender_id: String(senderId),
                 content,
+                reply_to_message_id: typeof value.reply_to_message_id === 'string' ? value.reply_to_message_id : null,
                 is_deleted: Boolean(value.is_deleted ?? value.deleted),
                 is_edited: Boolean(value.is_edited ?? value.edited),
                 created_at: String(value.created_at ?? value.createdAt ?? new Date().toISOString()),
@@ -95,6 +104,7 @@ export function findIncomingCircleChannelMessage(frame: unknown): CircleChannelM
                         is_member: Boolean(senderValue.is_member),
                     },
                     content,
+                    reply_to_message_id: typeof value.reply_to_message_id === 'string' ? value.reply_to_message_id : null,
                     is_deleted: Boolean(value.is_deleted ?? value.deleted),
                     is_edited: Boolean(value.is_edited ?? value.edited),
                     is_pinned: Boolean(value.is_pinned ?? value.pinned),

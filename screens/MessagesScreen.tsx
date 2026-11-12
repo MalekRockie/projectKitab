@@ -40,7 +40,7 @@ import {
     renameCircleFolder,
     updateCircleOrder,
 } from '../services/api/messages/circles';
-import { Message, formatMessageTime, getConversationInitials, mapConversationMessage } from '../services/messages/messageMapping';
+import { Message, createMessageSendEvent, formatMessageTime, getConversationInitials, mapConversationMessage } from '../services/messages/messageMapping';
 import { useMessagesSocket } from '../services/messages/useMessagesSocket';
 import { SERVERS, Server } from '../data/circles';
 import CircleChannelList from '../components/messages/CircleChannelList';
@@ -70,6 +70,7 @@ function mapCircleChannelMessage(message: CircleChannelMessage, currentUserId: s
         time: formatMessageTime(message.created_at),
         own,
         senderId: message.sender.user_id,
+        replyToMessageId: message.reply_to_message_id,
     };
 }
 
@@ -115,6 +116,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const [directChatOpen, setDirectChatOpen] = useState(false);
     const [modeChangeDirection, setModeChangeDirection] = useState<'toDirect' | 'toCircles' | null>(null);
     const [draft, setDraft] = useState('');
+    const [replySelection, setReplySelection] = useState<{ chatKey: string; message: Message } | null>(null);
     const conversationsRef = useRef(conversations);
     conversationsRef.current = conversations;
     const messageListRef = useRef<FlatList<Message> | null>(null);
@@ -169,7 +171,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     ? existing.findIndex(message => message.id.startsWith('pending-') && message.body === mappedMessage.body)
                     : -1;
                 const nextMessages = [...existing];
-                if (optimisticIndex >= 0) nextMessages.splice(optimisticIndex, 1, mappedMessage);
+                if (optimisticIndex >= 0) nextMessages.splice(optimisticIndex, 1, { ...mappedMessage, replyToMessageId: mappedMessage.replyToMessageId ?? existing[optimisticIndex].replyToMessageId });
                 else nextMessages.push(mappedMessage);
                 return { ...previous, [incoming.channel_id]: nextMessages };
             });
@@ -184,7 +186,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 ? existing.findIndex(message => message.id.startsWith('pending-') && message.body === mappedMessage.body)
                 : -1;
             const nextMessages = [...existing];
-            if (optimisticIndex >= 0) nextMessages.splice(optimisticIndex, 1, mappedMessage);
+            if (optimisticIndex >= 0) nextMessages.splice(optimisticIndex, 1, { ...mappedMessage, replyToMessageId: mappedMessage.replyToMessageId ?? existing[optimisticIndex].replyToMessageId });
             else nextMessages.push(mappedMessage);
             return { ...previous, [incoming.conversation_id]: nextMessages };
         });
@@ -409,6 +411,8 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
     const drawerHeaderNode = renderCircleHeader(false);
     const activeConversation = conversations.find(item => item.id === activeConversationId) ?? null;
     const activeChatId = room?.id ?? '';
+    const activeChatKey = mode === 'direct' ? `direct-${activeConversationId ?? ''}` : `circle-${activeChatId}`;
+    const replyTo = replySelection?.chatKey === activeChatKey ? replySelection.message : null;
     const activeMessages = mode === 'servers'
         ? channelMessagesById[activeChatId] ?? []
         : activeConversationId ? directMessages[activeConversationId] ?? [] : [];
@@ -602,17 +606,16 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 body,
                 time: formatMessageTime(createdAt),
                 own: true,
+                replyToMessageId: replyTo?.id,
             };
             try {
-                socket.send(JSON.stringify({
-                    event: 'message.send',
-                    data: { channel_id: activeChatId, content: body },
-                }));
+                socket.send(JSON.stringify(createMessageSendEvent({ channel_id: activeChatId }, body, replyTo?.id)));
                 setChannelMessagesById(previous => ({
                     ...previous,
                     [activeChatId]: [...(previous[activeChatId] ?? []), optimisticMessage],
                 }));
                 setDraft('');
+                setReplySelection(null);
                 setCircleMessagesError(null);
                 scrollToLatest();
             } catch (error) {
@@ -631,13 +634,11 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 body,
                 time: formatMessageTime(createdAt),
                 own: true,
+                replyToMessageId: replyTo?.id,
             };
 
             try {
-                socket.send(JSON.stringify({
-                    event: 'message.send',
-                    data: { conversation_id: activeConversationId, content: body },
-                }));
+                socket.send(JSON.stringify(createMessageSendEvent({ conversation_id: activeConversationId }, body, replyTo?.id)));
                 setDirectMessages(previous => ({
                     ...previous,
                     [activeConversationId]: [...(previous[activeConversationId] ?? []), optimisticMessage],
@@ -655,6 +656,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     }
                     : item));
                 setDraft('');
+                setReplySelection(null);
                 scrollToLatest();
             } catch (error) {
                 console.warn('Could not send direct message', error);
@@ -685,6 +687,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 listRef={messageListRef}
                 listKey={direct ? `direct-${activeConversationId ?? 'none'}` : `circle-${activeChatId}`}
                 messages={activeMessages}
+                onReply={message => setReplySelection({ chatKey: activeChatKey, message })}
                 title={direct ? (activeConversation ? directName : 'Select a conversation') : room?.name ?? 'Choose a circle'}
                 subtitle={direct ? activeConversation?.participant.username ?? '' : server && room ? `${server.name} · ${room.name}` : ''}
                 leading={direct ? (activeConversation ? { initials: getConversationInitials(activeConversation) } : undefined) : room ? 'hash' : undefined}
@@ -708,6 +711,8 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                     value: draft,
                     onChangeText: setDraft,
                     onSend: sendMessage,
+                    replyTo,
+                    onCancelReply: () => setReplySelection(null),
                     placeholder: direct
                         ? activeConversation ? `Message ${directName}` : 'Choose a conversation'
                         : room ? `Message #${room.name}` : 'Select a channel',

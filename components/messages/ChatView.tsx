@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useRef } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/useTheme';
 import { ThemeColors } from '../../theme/colors';
@@ -25,6 +25,7 @@ type ChatViewProps = {
     onBack?: () => void;
     onOpenChannels?: () => void;
     onPressAvatar?: (message: Message) => void;
+    onReply: (message: Message) => void;
     loading?: boolean;
     error?: string | null;
     onRetry?: () => void;
@@ -38,13 +39,31 @@ type ChatViewProps = {
 };
 
 export default function ChatView({
-    wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels, onPressAvatar,
+    wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels, onPressAvatar, onReply,
     loading = false, error = null, onRetry, emptyTitle, emptyCopy, composer,
     hasOlderMessages = false, loadingOlderMessages = false, olderMessagesError, onLoadOlderMessages,
 }: ChatViewProps) {
     const colors = useTheme();
     const historyScrollArmed = useRef(false);
-    const renderMessage = useCallback(({ item }: { item: Message }) => <MessageItem message={item} onPressAvatar={onPressAvatar} />, [onPressAvatar]);
+    const composerRef = useRef<TextInput>(null);
+    const pendingFocus = useRef<string | null>(null);
+    const [selected, setSelected] = useState<{ listKey: string; message: Message } | null>(null);
+    const selectedMessage = selected?.listKey === listKey ? selected.message : null;
+    useEffect(() => { setSelected(null); pendingFocus.current = null; }, [listKey]);
+    const focusComposer = useCallback(() => {
+        if (!composer.disabled && (!composer.connection || composer.connection.status === 'connected')) {
+            composerRef.current?.focus();
+        }
+    }, [composer.connection, composer.disabled]);
+    const handleSwipeReply = useCallback((message: Message) => {
+        onReply(message);
+        focusComposer();
+    }, [focusComposer, onReply]);
+    const messagesById = useMemo(() => new Map(messages.map(message => [message.id, message])), [messages]);
+    const openActions = useCallback((message: Message) => setSelected({ listKey, message }), [listKey]);
+    const renderMessage = useCallback(({ item }: { item: Message }) => (
+        <MessageItem message={item} onPressAvatar={onPressAvatar} onReply={item.id.startsWith('pending-') ? undefined : openActions} onSwipeReply={item.id.startsWith('pending-') ? undefined : handleSwipeReply} replyTo={item.replyToMessageId ? messagesById.get(item.replyToMessageId) : undefined} />
+    ), [handleSwipeReply, messagesById, onPressAvatar, openActions]);
     const handleEndReached = useCallback(() => {
         if (historyScrollArmed.current && hasOlderMessages && !loadingOlderMessages) {
             historyScrollArmed.current = false;
@@ -106,7 +125,37 @@ export default function ChatView({
                 ListFooterComponent={olderMessagesControl}
                 ListEmptyComponent={emptyState}
             />
-            <Composer wide={wide} {...composer} />
+            <Composer wide={wide} {...composer} inputRef={composerRef} />
+            <Modal visible={Boolean(selectedMessage)} transparent animationType="fade" onRequestClose={() => setSelected(null)} onDismiss={() => {
+                if (pendingFocus.current === listKey) {
+                    pendingFocus.current = null;
+                    focusComposer();
+                }
+            }}>
+                <View style={styles.modal}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelected(null)} accessibilityLabel="Close message actions" accessibilityRole="button" />
+                    <View style={styles.actionSheet}>
+                        <Pressable style={styles.action} accessibilityRole="button" accessibilityLabel="Reply to message" onPress={() => {
+                            if (selectedMessage) {
+                                onReply(selectedMessage);
+                                pendingFocus.current = listKey;
+                                if (Platform.OS !== 'ios') {
+                                    requestAnimationFrame(() => {
+                                        if (pendingFocus.current === listKey) {
+                                            pendingFocus.current = null;
+                                            focusComposer();
+                                        }
+                                    });
+                                }
+                            }
+                            setSelected(null);
+                        }}>
+                            <Icon name="reply" size={22} color={colors.text} />
+                            <Text style={styles.actionText}>Reply</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -128,4 +177,8 @@ const createStyles = (colors: ThemeColors, wide: boolean) => StyleSheet.create({
     retryText: { color: colors.accent, fontSize: 13, fontWeight: '700', marginTop: 10 },
     olderMessages: { minHeight: 34, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
     hiddenText: { opacity: 0 },
+    modal: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+    actionSheet: { backgroundColor: colors.surface, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 30, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+    action: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52 },
+    actionText: { color: colors.text, fontSize: 15, fontWeight: '600' },
 });
