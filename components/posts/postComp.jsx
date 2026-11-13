@@ -274,6 +274,7 @@ const PostComponent = memo(({ postId, onRemoveBookmark }) => {
                     onPress={event => handleOpenDisplayProfile(event, displayPost)}
                     accessibilityRole="button"
                     accessibilityLabel="Open post author's profile"
+                    style={{ alignSelf: 'flex-start' }}
                 >
                     <Image
                         source={displayPost.user_avatar ? { uri: displayPost.user_avatar } : require('../../icons/avatar.png')}

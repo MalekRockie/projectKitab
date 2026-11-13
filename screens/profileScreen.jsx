@@ -79,12 +79,12 @@ export const ProfileScreen = ({ route }) => {
                     </Pressable> : null}
                 </View>
                 {shownDisplayName ? <Text style={styles.displayName}>{shownDisplayName}</Text> : null}
-                <Text style={styles.username}>{shownUsername}</Text>
+                <Text style={styles.username}>{"@" + shownUsername}</Text>
                 {shownBio ? <Text style={styles.bio}>{shownBio}</Text> : null}
+                {joinedDate ? <Text style={[styles.summaryMeta, styles.joinedDate]}>Joined {joinedDate}</Text> : null}
                 <View style={styles.profileDetails}>
-                    <Text style={styles.summaryMeta}>{publicProfile.followers_count ?? 0} followers</Text>
-                    <Text style={styles.summaryMeta}>{publicProfile.following_count ?? 0} following</Text>
-                    {joinedDate ? <Text style={styles.summaryMeta}>Joined {joinedDate}</Text> : null}
+                    <Text style={styles.summaryMeta}><Text style={styles.followCount}>{publicProfile.followers_count ?? 0}</Text> followers</Text>
+                    <Text style={styles.summaryMeta}><Text style={styles.followCount}>{publicProfile.following_count ?? 0}</Text> following</Text>
                 </View>
             </View>
             <ProfilePostsPager available={isSelf} />
@@ -154,15 +154,15 @@ const createStyles = (colors) => StyleSheet.create({
         fontWeight: '600',
     },
     username: {
-        color: colors.text,
-        fontSize: 21,
-        fontWeight: '700',
+        color: '#888',
+        fontSize: 14,
+        fontWeight: '500',
         marginHorizontal: 20,
         marginTop: 4,
     },
     displayName: {
         color: colors.text,
-        fontSize: 18,
+        fontSize: 21,
         fontWeight: '600',
         marginHorizontal: 20,
         marginTop: 4,
@@ -186,6 +186,13 @@ const createStyles = (colors) => StyleSheet.create({
     summaryMeta: {
         color: colors.textSecondary,
         fontSize: 13,
+    },
+    joinedDate: {
+        marginHorizontal: 20,
+        marginTop: 10,
+    },
+    followCount: {
+        color: colors.text,
     },
 });
 
