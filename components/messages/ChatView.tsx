@@ -7,6 +7,7 @@ import { Message } from '../../services/messages/messageMapping';
 import Avatar, { AVATAR_TINTS } from './Avatar';
 import Composer, { ComposerProps } from './Composer';
 import MessageItem from './MessageItem';
+import { updateNavigationBarScroll } from '../common/BottomNavigationBar';
 
 // In the inverted list index 0 is the newest message: keep older rows still, but follow new ones when within 100px of the bottom.
 const MESSAGE_LIST_ANCHORING = { minIndexForVisible: 1, autoscrollToTopThreshold: 100 };
@@ -26,6 +27,7 @@ type ChatViewProps = {
     onOpenChannels?: () => void;
     onPressAvatar?: (message: Message) => void;
     onReply: (message: Message) => void;
+    onNavigationBarVisibilityChange?: (visible: boolean) => void;
     loading?: boolean;
     error?: string | null;
     onRetry?: () => void;
@@ -39,17 +41,26 @@ type ChatViewProps = {
 };
 
 export default function ChatView({
-    wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels, onPressAvatar, onReply,
+    wide, listRef, listKey, messages, title, subtitle, leading, onBack, onOpenChannels, onPressAvatar, onReply, onNavigationBarVisibilityChange,
     loading = false, error = null, onRetry, emptyTitle, emptyCopy, composer,
     hasOlderMessages = false, loadingOlderMessages = false, olderMessagesError, onLoadOlderMessages,
 }: ChatViewProps) {
     const colors = useTheme();
     const historyScrollArmed = useRef(false);
+    const lastScrollOffset = useRef<number | null>(null);
+    const navigationBarScrollDistance = useRef(0);
+    const isUserScrolling = useRef(false);
     const composerRef = useRef<TextInput>(null);
     const pendingFocus = useRef<string | null>(null);
     const [selected, setSelected] = useState<{ listKey: string; message: Message } | null>(null);
     const selectedMessage = selected?.listKey === listKey ? selected.message : null;
-    useEffect(() => { setSelected(null); pendingFocus.current = null; }, [listKey]);
+    useEffect(() => {
+        setSelected(null);
+        pendingFocus.current = null;
+        lastScrollOffset.current = null;
+        navigationBarScrollDistance.current = 0;
+        onNavigationBarVisibilityChange?.(true);
+    }, [listKey, onNavigationBarVisibilityChange]);
     const focusComposer = useCallback(() => {
         if (!composer.disabled && (!composer.connection || composer.connection.status === 'connected')) {
             composerRef.current?.focus();
@@ -118,7 +129,22 @@ export default function ChatView({
                 maintainVisibleContentPosition={MESSAGE_LIST_ANCHORING}
                 keyExtractor={keyExtractor}
                 renderItem={renderMessage}
-                onScrollBeginDrag={() => { historyScrollArmed.current = true; }}
+                onScrollBeginDrag={() => { historyScrollArmed.current = true; isUserScrolling.current = true; lastScrollOffset.current = null; }}
+                onScrollEndDrag={() => { isUserScrolling.current = false; }}
+                onMomentumScrollBegin={() => { isUserScrolling.current = true; }}
+                onMomentumScrollEnd={() => { isUserScrolling.current = false; }}
+                onScroll={({ nativeEvent }) => {
+                    const offset = -nativeEvent.contentOffset.y;
+                    if (isUserScrolling.current && lastScrollOffset.current !== null) {
+                        const result = updateNavigationBarScroll(navigationBarScrollDistance.current, offset - lastScrollOffset.current);
+                        navigationBarScrollDistance.current = result.distance;
+                        if (result.visible !== undefined) {
+                            onNavigationBarVisibilityChange?.(result.visible);
+                        }
+                    }
+                    lastScrollOffset.current = offset;
+                }}
+                scrollEventThrottle={16}
                 onEndReached={handleEndReached}
                 onEndReachedThreshold={0.25}
                 contentContainerStyle={styles.list}

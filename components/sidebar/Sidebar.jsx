@@ -18,7 +18,7 @@ const SIDEBAR_TABS = [
     { label: 'Settings', stack: 'MainApp', screen: 'Settings', icon: 'settings' },
 ];
 
-export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
+export const Sidebar = ({visible, onClose, onOpen, sidebarOffset, onNavigateTab}) => {
 
     let windowWidth = Dimensions.get('window').width;
 
@@ -29,7 +29,11 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
     const navigation = useNavigation();
 
     const redirect = (stack, screen) => {
-        navigation.navigate(stack, { screen: screen })
+        if (screen === 'Home' || screen === 'Messages') {
+            onNavigateTab(screen);
+        } else {
+            navigation.navigate(stack, { screen: screen });
+        }
     };
 
     const openTab = (stack, screen) => {
@@ -91,8 +95,8 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
         .onFinalize((event) => {
             pressed.value = false;
             const midpoint = (windowWidth)/2;
-            
-            const shouldSnapRight = (offset.value > midpoint || 
+
+            const shouldSnapRight = (offset.value > midpoint ||
                 (Math.abs(event.velocityX) > 500 && event.velocityX > 0));
             const vis = visible;
             if(shouldSnapRight) {
@@ -111,11 +115,11 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
     })
 
     return(
-        <View style={{height: '100%',
+        <View pointerEvents="box-none" style={{height: '100%',
             width: '100%',
             position: 'absolute',
             right: 0,}}>
-            
+
             <GestureDetector gesture={pan}>
                 <Animated.View style={[slidingAnimation, styles.container]}>
                     <View style={styles.sidebarContainer}>
@@ -128,7 +132,7 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
                                 android_disableSound={true}
                                 style={({ pressed }) => [styles.sidebarBtns, { backgroundColor: pressed ? '#3e3e3e62' : '#29292905' }]}>
                                     <Text style={styles.sidebarBtnsText}>
-                                        <IconF 
+                                        <IconF
                                             name={icon}
                                             size={25}
                                             color={'#ffffff'}
@@ -151,7 +155,7 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
 
                                             </Text>
                                         </View>
-                                        <Icon 
+                                        <Icon
                                             name="dots-three-horizontal"
                                             size={20}
                                             color={'#ffffff'}
@@ -166,20 +170,20 @@ export const Sidebar = ({visible, onClose, onOpen, sidebarOffset}) => {
 
 
             {visible && (
-                <Pressable 
+                <Pressable
                     style={[styles.sidebarShadow, { position: 'absolute', zIndex: 1 }]}
                     pointerEvents={visible ? 'auto' : 'none'}
                     android_disableSound={true}
                     onPress={toggleSidebar}>
-                    <Animated.View style={[ShadowAnimation, { height: '100%', width: '100%' }]} 
+                    <Animated.View style={[ShadowAnimation, { height: '100%', width: '100%' }]}
                         pointerEvents="none"
                     />
                 </Pressable>
             )}
         </View>
     )
-    
-    function CustomDrawerContent() {        
+
+    function CustomDrawerContent() {
         return (
             <View style={{
                 padding: 20,

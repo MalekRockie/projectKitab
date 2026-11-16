@@ -41,13 +41,14 @@ jest.mock('react-native', () => {
     value: ({
       data,
       renderItem,
+      ...props
     }: {
       data: Message[];
       renderItem: (args: {item: Message}) => React.ReactNode;
     }) =>
       ReactModule.createElement(
         actual.View,
-        null,
+        {testID: 'message-list', ...props},
         data.map(item =>
           ReactModule.createElement(
             ReactModule.Fragment,
@@ -217,6 +218,32 @@ describe('message reply interaction', () => {
     });
     await act(() => { renderer!.root.findByType('GestureDetector' as any).props.gesture.onEndValue({translationX: -60}); });
     expect(mockFocus).not.toHaveBeenCalled();
+  });
+
+  it('shows and hides the bar based on inverted message-list scrolling', async () => {
+    const onVisibilityChange = jest.fn();
+    let renderer: ReactTestRenderer.ReactTestRenderer;
+    await act(() => {
+      renderer = ReactTestRenderer.create(
+        <ChatView wide={false} listRef={null} listKey="chat" messages={[message]} title="Chat" subtitle="" emptyTitle="" emptyCopy="" onReply={jest.fn()} onNavigationBarVisibilityChange={onVisibilityChange} composer={{value: '', onChangeText: jest.fn(), onSend: jest.fn(), placeholder: 'Message'}} />,
+      );
+    });
+    onVisibilityChange.mockClear();
+    const list = renderer!.root.findByProps({testID: 'message-list'});
+    await act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll({nativeEvent: {contentOffset: {y: 0}}});
+      list.props.onScroll({nativeEvent: {contentOffset: {y: 24}}});
+    });
+    expect(onVisibilityChange).toHaveBeenLastCalledWith(true);
+    await act(() => { list.props.onScroll({nativeEvent: {contentOffset: {y: 4}}}); });
+    expect(onVisibilityChange).toHaveBeenLastCalledWith(false);
+    await act(() => {
+      list.props.onScrollEndDrag();
+      onVisibilityChange.mockClear();
+      list.props.onScroll({nativeEvent: {contentOffset: {y: 50}}});
+    });
+    expect(onVisibilityChange).not.toHaveBeenCalled();
   });
 
   it('focuses after closing the reply menu on Android', async () => {

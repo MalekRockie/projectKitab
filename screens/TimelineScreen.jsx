@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { 
-    View, 
-    FlatList, 
-    StyleSheet, 
-    ActivityIndicator, 
+import {
+    View,
+    FlatList,
+    StyleSheet,
+    ActivityIndicator,
     Text,
-    RefreshControl 
+    RefreshControl
 } from 'react-native';
-import { useFeed } from '../services/api/feed/useFeed'; 
+import { useFeed } from '../services/api/feed/useFeed';
 import { usePStore } from '../services/storage/store/postStore';
 import PostComponent from '../components/posts/postComp';
 import { shallow } from 'zustand/shallow';
@@ -19,7 +19,7 @@ export const TimelineScreen = ({ tabType = 'foryou', isActive = true, onTimeline
     const isUserScrolling = useRef(false);
     const colors = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
-    
+
     const {
         isLoading,
         isRefreshing,
@@ -49,7 +49,7 @@ export const TimelineScreen = ({ tabType = 'foryou', isActive = true, onTimeline
         if (isUserScrolling.current && distanceFromEnd > 80) {
             endReachedForScroll.current = false;
         }
-        onTimelineScroll?.(contentOffset.y, tabType, isActive);
+        onTimelineScroll?.(contentOffset.y, tabType, isActive, isUserScrolling.current);
     }, [isActive, onTimelineScroll, tabType]);
 
     const handleScrollBegin = useCallback(() => {
@@ -95,8 +95,8 @@ export const TimelineScreen = ({ tabType = 'foryou', isActive = true, onTimeline
         return (
             <View style={styles.centerContainer}>
                 <Text style={styles.errorText}>Error: {error}</Text>
-                <Text 
-                    style={styles.retryText} 
+                <Text
+                    style={styles.retryText}
                     onPress={refresh}
                 >
                     Tap to retry

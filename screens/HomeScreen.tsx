@@ -3,8 +3,10 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Pressable, Dimensions,
 import { TimelineScreen } from './TimelineScreen';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
 import { ThemeColors, darkColors } from '../theme/colors';
+import { updateNavigationBarScroll } from '../components/common/BottomNavigationBar';
 
 const routes = [
     { key: 'following', title: 'Following' },
@@ -20,13 +22,15 @@ const SHOW_SCROLL_THRESHOLD = 20;
 interface HomeScreenProps {
     onOpenSidebar: () => void;
     sidebarOffset: SharedValue<number>;
+    onNavigationBarVisibilityChange: (visible: boolean) => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOffset }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOffset, onNavigationBarVisibilityChange }) => {
     const colors = useTheme();
+    const isFocused = useIsFocused();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const isDark = colors === darkColors;
-    
+
     const windowWidth = Dimensions.get('window').width;
 
     const [tabIndex, setTabIndex] = useState(1);
@@ -34,6 +38,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
     const activeFeedKey = useRef(routes[tabIndex].key);
     const lastScrollY = useRef<number | null>(null);
     const upwardDistance = useRef(0);
+    const navigationBarScrollDistance = useRef(0);
+    const navigationBarScrollOffset = useRef<number | null>(null);
     const isRevealingChrome = useRef(false);
     const statusBarHidden = useRef(false);
     const chromeCollapse = useSharedValue(0);
@@ -49,7 +55,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
         setTabIndex(index);
     };
 
-    const pan = Gesture.Pan()
+    const pan = useMemo(() => Gesture.Pan()
         .activeOffsetX([-10, 10])
         .failOffsetY([-5, 5])
         .onBegin(() => {
@@ -89,7 +95,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
             nextIndex = Math.min(Math.max(nextIndex, 0), routes.length - 1);
             pagerX.value = withTiming(-nextIndex * windowWidth);
             runOnJS(setTabIndex)(nextIndex);
-        });
+        }), [maxPagerOffset, onOpenSidebar, pagerX, sidebarOffset, startX, windowWidth]);
 
     const pagerStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: pagerX.value }],
@@ -126,20 +132,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
         }
     };
 
-    const handleTimelineScroll = (offsetY: number, feedKey: string, isActive: boolean) => {
+    const handleTimelineScroll = (offsetY: number, feedKey: string, isActive: boolean, isUserScrolling: boolean) => {
         if (!isActive) return;
         if (activeFeedKey.current !== feedKey) {
             activeFeedKey.current = feedKey;
             lastScrollY.current = offsetY;
             upwardDistance.current = 0;
+            navigationBarScrollDistance.current = 0;
+            navigationBarScrollOffset.current = offsetY;
             isRevealingChrome.current = false;
             return;
         }
+        if (isUserScrolling && navigationBarScrollOffset.current !== null) {
+            const result = updateNavigationBarScroll(navigationBarScrollDistance.current, offsetY - navigationBarScrollOffset.current);
+            navigationBarScrollDistance.current = result.distance;
+            if (result.visible !== undefined) {
+                onNavigationBarVisibilityChange(result.visible);
+            }
+        }
+        navigationBarScrollOffset.current = offsetY;
         if (lastScrollY.current === null || offsetY <= 0) {
             lastScrollY.current = Math.max(0, offsetY);
             upwardDistance.current = 0;
             isRevealingChrome.current = false;
-            if (offsetY <= 0) updateChromeCollapse(0);
+            if (offsetY <= 0) {
+                updateChromeCollapse(0);
+            }
             return;
         }
 
@@ -167,12 +185,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
 
     return (
         <View style={styles.container}>
-            <StatusBar
+            {isFocused ? <StatusBar
                 hidden={isStatusBarHidden}
                 animated
                 barStyle={isDark ? 'light-content' : 'dark-content'}
                 backgroundColor={colors.surface}
-            />
+            /> : null}
 
             <Animated.View style={[styles.statusBarInset, statusBarInsetStyle]} />
             <Animated.View style={[styles.headerClip, headerClipStyle]}>
@@ -206,8 +224,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
                 </Animated.View>
             </Animated.View>
 
-            <View style={{ flex: 1, overflow: 'hidden' }}>
-                <GestureDetector gesture={pan}>
+            <GestureDetector gesture={pan}>
+                <View testID="home-swipe-viewport" collapsable={false} style={{ flex: 1, overflow: 'hidden' }}>
                     <Animated.View style={[{ flex: 1, flexDirection: 'row', width: windowWidth * routes.length }, pagerStyle]}>
                         {routes.map((tab, index) => (
                             <View key={tab.key} style={{ width: windowWidth, backgroundColor: colors.background }}>
@@ -219,8 +237,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onOpenSidebar, sidebarOf
                             </View>
                         ))}
                     </Animated.View>
-                </GestureDetector>
-            </View>
+                </View>
+            </GestureDetector>
         </View>
     );
 };
@@ -261,12 +279,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         padding: 10,
         paddingBottom: 8,
         paddingTop: 8,
-    }, 
+    },
     selectedTab: {
         borderBottomWidth: 2,
-        // Replaced hardcoded '#00e5ffff' with theme text color. 
+        // Replaced hardcoded '#00e5ffff' with theme text color.
         // If you add a 'primary' brand color to your theme later, use that here!
-        borderBottomColor: colors.text, 
+        borderBottomColor: colors.text,
     },
     tabText: {
         color: colors.textSecondary,

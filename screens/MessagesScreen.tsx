@@ -15,6 +15,7 @@ import Animated, { runOnJS, SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRig
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
 import { ThemeColors } from '../theme/colors';
 import { useCUserStore } from '../services/storage/store/cUserStore';
@@ -58,7 +59,7 @@ import CircleRail, { CircleDragEntity, CircleDropTarget } from '../components/me
 import DirectInbox from '../components/messages/DirectInbox';
 import { useCircleDrawer } from '../components/messages/useCircleDrawer';
 
-type MessagesScreenProps = { onOpenSidebar: () => void };
+type MessagesScreenProps = { onOpenSidebar: () => void; onNavigationBarVisibilityChange: (visible: boolean) => void; bottomBarVisible: boolean };
 
 function mapCircleChannelMessage(message: CircleChannelMessage, currentUserId: string): Message {
     const senderName = message.sender.nickname || message.sender.display_name || message.sender.username || 'Unknown member';
@@ -74,8 +75,9 @@ function mapCircleChannelMessage(message: CircleChannelMessage, currentUserId: s
     };
 }
 
-export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
+export default function MessagesScreen({ onOpenSidebar, onNavigationBarVisibilityChange, bottomBarVisible }: MessagesScreenProps) {
     const colors = useTheme();
+    const isFocused = useIsFocused();
     const { width } = useWindowDimensions();
     const wide = width >= 760;
     const styles = useMemo(() => createStyles(colors, wide), [colors, wide]);
@@ -687,6 +689,7 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
                 listRef={messageListRef}
                 listKey={direct ? `direct-${activeConversationId ?? 'none'}` : `circle-${activeChatId}`}
                 messages={activeMessages}
+                onNavigationBarVisibilityChange={onNavigationBarVisibilityChange}
                 onReply={message => setReplySelection({ chatKey: activeChatKey, message })}
                 title={direct ? (activeConversation ? directName : 'Select a conversation') : room?.name ?? 'Choose a circle'}
                 subtitle={direct ? activeConversation?.participant.username ?? '' : server && room ? `${server.name} · ${room.name}` : ''}
@@ -800,8 +803,8 @@ export default function MessagesScreen({ onOpenSidebar }: MessagesScreenProps) {
         </View>
     );
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-            <StatusBar barStyle={colors.background === '#000000' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        <SafeAreaView style={styles.safeArea} edges={bottomBarVisible ? ['top'] : ['top', 'bottom']}>
+            {isFocused ? <StatusBar barStyle={colors.background === '#000000' ? 'light-content' : 'dark-content'} backgroundColor={colors.background} /> : null}
             <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 {!inMobileDirectChat ? <View style={[styles.topBar, !wide && styles.topBarMobile]}>
                     <View style={styles.brandBlock}>
