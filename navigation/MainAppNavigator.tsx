@@ -19,12 +19,14 @@ import MessagesScreen from "../screens/MessagesScreen";
 import { useSharedValue } from "react-native-reanimated";
 import { useSettingsSync } from "../services/sync/useSettingsSync";
 import { getMainTabActions, MainTab } from './mainTabNavigation';
+import { useTheme } from "../theme/useTheme";
 
 const Stack = createStackNavigator();
 const Tabs = createBottomTabNavigator();
 
 function MainAppNavigator() {
     useSettingsSync();
+    const colors = useTheme();
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const [barVisible, setBarVisible] = useState(true);
     const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -84,8 +86,8 @@ function MainAppNavigator() {
             >
                 <Stack.Screen name="MainTabs">
                     {() => (
-                        <View style={{ flex: 1 }}>
-                            <Tabs.Navigator screenOptions={{ headerShown: false, animation: sidebarTab ? 'shift' : 'none', freezeOnBlur: false }} detachInactiveScreens tabBar={() => null}>
+                        <View style={{ flex: 1, backgroundColor: colors.background }}>
+                            <Tabs.Navigator screenOptions={{ headerShown: false, animation: sidebarTab ? 'shift' : 'none', freezeOnBlur: false, sceneStyle: { backgroundColor: colors.background } }} detachInactiveScreens tabBar={() => null}>
                                 <Tabs.Screen name="Home">
                                     {props => <HomeScreen {...props} onOpenSidebar={openSidebar} sidebarOffset={sidebarOffset} onNavigationBarVisibilityChange={setBarVisible} />}
                                 </Tabs.Screen>

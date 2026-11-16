@@ -35,6 +35,7 @@ jest.mock('@react-navigation/bottom-tabs', () => {
 });
 jest.mock('react-native-reanimated', () => ({ useSharedValue: (value: number) => require('react').useRef({ value }).current }));
 jest.mock('../services/sync/useSettingsSync', () => ({ useSettingsSync: () => {} }));
+jest.mock('../theme/useTheme', () => ({ useTheme: () => require('../theme/colors').darkColors }));
 jest.mock('../components/sidebar/Sidebar', () => ({
     Sidebar: ({ onNavigateTab }: { onNavigateTab: (screen: string) => void }) =>
         require('react').createElement(require('react-native').Pressable, { accessibilityLabel: 'Sidebar Messages', onPress: () => onNavigateTab('Messages') }),
@@ -88,8 +89,9 @@ it('opens Messages from the bottom bar on the first attempt', async () => {
     });
     expect(mockTabOptions).toHaveBeenLastCalledWith(expect.objectContaining({
         detachInactiveScreens: true,
-        screenOptions: expect.objectContaining({ freezeOnBlur: false }),
+        screenOptions: expect.objectContaining({ freezeOnBlur: false, sceneStyle: { backgroundColor: '#000000' } }),
     }));
+    expect(renderer!.root.findByType(BottomNavigationBar).parent!.props.style.backgroundColor).toBe('#000000');
     await act(() => { renderer!.root.findByProps({ accessibilityLabel: 'Messages tab' }).props.onPress(); });
     expect(renderer!.root.findAllByProps({ testID: 'tab-Messages' }).some(node => node.props.style?.display === 'flex')).toBe(true);
     await act(() => { renderer!.unmount(); });

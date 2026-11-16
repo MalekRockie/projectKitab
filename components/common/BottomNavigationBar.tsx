@@ -40,11 +40,10 @@ export default function BottomNavigationBar({ activeScreen, visible, onNavigate 
     }, [progress, visible]);
 
     const clipStyle = useAnimatedStyle(() => ({ height: height * progress.value }));
-    const barStyle = useAnimatedStyle(() => ({ transform: [{ translateY: height * (1 - progress.value) }] }));
 
     return (
         <Animated.View style={[styles.clip, clipStyle]} pointerEvents={visible ? 'auto' : 'none'}>
-            <Animated.View style={[styles.bar, { height, paddingBottom: insets.bottom }, barStyle]}>
+            <View style={[styles.bar, { height, paddingBottom: insets.bottom }]}>
                 {items.map(item => {
                     const screen = 'screen' in item ? item.screen : undefined;
                     const selected = screen === activeScreen;
@@ -64,7 +63,7 @@ export default function BottomNavigationBar({ activeScreen, visible, onNavigate 
                         </Pressable>
                     );
                 })}
-            </Animated.View>
+            </View>
         </Animated.View>
     );
 }
